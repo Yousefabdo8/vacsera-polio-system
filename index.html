@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>فاكسيرا VACSERA | نظام Polio لإدارة وتتبع الأجهزة المعملية</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts: Cairo & Tajawal -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <!-- QRCode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            vacsera: {
+              red: '#D32828',
+              redDark: '#A61A1A',
+              black: '#111827',
+              grayBg: '#F4F5F7'
+            }
+          },
+          fontFamily: {
+            sans: ['Cairo', 'Tajawal', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Cairo', sans-serif;
+      background-color: #f8fafc;
+    }
+    .modal-backdrop {
+      background-color: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(4px);
+    }
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #printModalContent, #printModalContent * {
+        visibility: visible;
+      }
+      #printModalContent {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 10px;
+        box-shadow: none !important;
+        border: 2px solid #000 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-white border-b-2 border-vacsera-red sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Brand & Logos -->
+      <div class="flex items-center gap-4">
+        <!-- VACSERA Logo -->
+        <div class="relative group cursor-pointer" onclick="document.getElementById('logoFileInput').click()" title="اضغط لرفع لوجو من جهازك">
+          <div id="vacseraLogoContainer" class="h-12 w-40 flex items-center justify-center bg-white p-1 rounded-xl border border-slate-200 shadow-xs hover:border-red-300 transition">
+            <svg viewBox="0 0 280 80" class="w-full h-full select-none" xmlns="http://www.w3.org/2000/svg">
+              <polygon points="0,78 280,78 280,26 80,62 0,78" fill="#111827" />
+              <text x="5" y="66" font-family="'Cairo', 'Impact', sans-serif" font-weight="900" font-style="italic" font-size="74" fill="#D32828" letter-spacing="-2">VACSERA</text>
+              <g clip-path="url(#logoCutExact)">
+                <clipPath id="logoCutExact">
+                  <polygon points="0,78 280,78 280,26 80,62 0,78" />
+                </clipPath>
+                <text x="5" y="66" font-family="'Cairo', 'Impact', sans-serif" font-weight="900" font-style="italic" font-size="74" fill="#FFFFFF" letter-spacing="-2">VACSERA</text>
+              </g>
+            </svg>
+          </div>
+          <span class="absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[11px] font-bold transition">
+            <i class="fa-solid fa-camera ml-1"></i> تغيير الشعار
+          </span>
+          <input type="file" id="logoFileInput" accept="image/*" class="hidden" onchange="handleLogoUpload(event)">
+        </div>
+
+        <div class="border-r-2 border-slate-200 pr-4">
+          <div class="flex items-center gap-2">
+            <span class="bg-vacsera-red text-white text-xs font-black px-2.5 py-0.5 rounded tracking-wider">POLIO</span>
+            <h1 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight">نظام إدارة ومتابعة الأجهزة الطبية</h1>
+          </div>
+          <p class="text-xs text-slate-500 font-medium">الشركة المصرية لإنتاج الأمصال واللقاحات والأدوية (فاكسيرا - VACSERA)</p>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex items-center gap-2">
+        <label class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold py-2 px-3 rounded-xl flex items-center gap-2 cursor-pointer transition">
+          <i class="fa-solid fa-file-excel text-emerald-600"></i>
+          <span>استيراد CSV / Excel</span>
+          <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="importCSV(event)">
+        </label>
+        
+        <button onclick="exportData()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold py-2 px-3 rounded-xl flex items-center gap-2 transition">
+          <i class="fa-solid fa-file-arrow-down text-blue-600"></i>
+          <span>تصدير تقرير</span>
+        </button>
+
+        <button onclick="openDeviceModal()" class="bg-vacsera-red hover:bg-vacsera-redDark text-white text-xs sm:text-sm font-bold py-2 px-4 rounded-xl flex items-center gap-2 shadow-sm transition">
+          <i class="fa-solid fa-circle-plus"></i>
+          <span>إضافة جهاز جديد</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+    <!-- KPI / Statistics Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      
+      <div onclick="filterByCard('ALL')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-vacsera-red transition">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs text-slate-500 font-bold">إجمالي الأجهزة</span>
+          <i class="fa-solid fa-boxes-stacked text-slate-400 text-sm"></i>
+        </div>
+        <div class="text-2xl font-black text-slate-900" id="statTotal">0</div>
+      </div>
+
+      <div onclick="filterByCard('OPERATIONAL')" class="bg-white p-3.5 rounded-2xl border border-emerald-100 shadow-xs cursor-pointer hover:border-emerald-500 transition">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs text-emerald-700 font-bold">تعمل بكفاءة</span>
+          <i class="fa-solid fa-circle-check text-emerald-500 text-sm"></i>
+        </div>
+        <div class="text-2xl font-black text-emerald-600" id="statOperational">0</div>
+      </div>
+
+      <div onclick="filterByCard('MAINTENANCE')" class="bg-white p-3.5 rounded-2xl border border-amber-100 shadow-xs cursor-pointer hover:border-amber-500 transition">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs text-amber-700 font-bold">تحت الصيانة</span>
+          <i class="fa-solid fa-screwdriver-wrench text-amber-500 text-sm"></i>
+        </div>
+        <div class="text-2xl font-black text-amber-600" id="statMaintenance">0</div>
+      </div>
+
+      <div onclick="filterByCard('OVERDUE')" class="bg-red-50 p-3.5 rounded-2xl border border-red-200 shadow-xs cursor-pointer hover:border-red-500 transition">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs text-red-700 font-bold">متأخر عن الفحص</span>
+          <i class="fa-solid fa-triangle-exclamation text-red-500 text-sm animate-pulse"></i>
+        </div>
+        <div class="text-2xl font-black text-red-600" id="statOverdue">0</div>
+      </div>
+
+      <div onclick="filterByCard('UPCOMING')" class="bg-amber-50 p-3.5 rounded-2xl border border-amber-200 shadow-xs cursor-pointer hover:border-amber-500 transition">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs text-amber-800 font-bold">فحص قريباً</span>
+          <i class="fa-solid fa-clock-rotate-left text-amber-500 text-sm"></i>
+        </div>
+        <div class="text-2xl font-black text-amber-700" id="statUpcoming">0</div>
+      </div>
+
+      <div onclick="filterByCard('OUT')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-slate-500 transition">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs text-slate-600 font-bold">خارج الخدمة</span>
+          <i class="fa-solid fa-ban text-slate-400 text-sm"></i>
+        </div>
+        <div class="text-2xl font-black text-slate-700" id="statOut">0</div>
+      </div>
+
+    </div>
+
+    <!-- Filters & Search Toolbar -->
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-wrap gap-3 items-center justify-between">
+      
+      <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+        <!-- Live Search -->
+        <div class="relative flex-1 min-w-[200px]">
+          <i class="fa-solid fa-magnifying-glass absolute right-3 top-3 text-slate-400 text-sm"></i>
+          <input type="text" id="searchInput" oninput="renderTable()" placeholder="بحث سريع: اسم الجهاز، الشركة، S/N..." class="w-full pr-9 pl-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-vacsera-red">
+        </div>
+
+        <!-- Lab Filter -->
+        <select id="labFilter" onchange="renderTable()" class="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-vacsera-red">
+          <option value="ALL">جميع المعامل (All Labs)</option>
+          <option value="AFP">معمل 1 (AFP)</option>
+          <option value="ENV">معمل 2 (ENV)</option>
+          <option value="PCR">معمل 3 (PCR)</option>
+          <option value="C.C">معمل 4 (C.C)</option>
+        </select>
+
+        <!-- Status Filter -->
+        <select id="statusFilter" onchange="renderTable()" class="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-vacsera-red">
+          <option value="ALL">جميع الحالات</option>
+          <option value="سليم">يعمل بكفاءة</option>
+          <option value="صيانة">تحت الصيانة</option>
+          <option value="خارج الخدمة">خارج الخدمة</option>
+        </select>
+
+        <!-- Overdue Filter Checkbox -->
+        <label class="flex items-center gap-2 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-xl cursor-pointer">
+          <input type="checkbox" id="overdueOnly" onchange="renderTable()" class="rounded text-vacsera-red focus:ring-0">
+          <span>المتأخرة عن موعد الفحص فقط</span>
+        </label>
+      </div>
+
+      <div class="text-xs text-slate-500 font-bold">
+        عرض <span id="displayedCount" class="text-vacsera-red font-black">0</span> جهاز
+      </div>
+
+    </div>
+
+    <!-- Data Table -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-right text-xs sm:text-sm">
+          <thead class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 select-none">
+            <tr>
+              <th class="py-3.5 px-4">اسم الجهاز</th>
+              <th class="py-3.5 px-4">الشركة المصنعة</th>
+              <th class="py-3.5 px-4">الرقم التسلسلي (S/N)</th>
+              <th class="py-3.5 px-4">المعمل</th>
+              <th class="py-3.5 px-4">آخر فحص</th>
+              <th class="py-3.5 px-4">الفحص القادم</th>
+              <th class="py-3.5 px-4 text-center">الحالة</th>
+              <th class="py-3.5 px-4 text-center">الإجراءات</th>
+            </tr>
+          </thead>
+          <tbody id="devicesTableBody" class="divide-y divide-slate-100">
+            <!-- Dynamic rows will be rendered here -->
+          </tbody>
+        </table>
+      </div>
+      
+      <div id="emptyState" class="hidden p-12 text-center text-slate-400">
+        <i class="fa-solid fa-folder-open text-4xl mb-3 text-slate-300"></i>
+        <p class="font-bold">لا توجد أجهزة مطابقة للبحث أو الفلتر المختار</p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+    <p>الشركة المصرية لإنتاج الأمصال واللقاحات والأدوية (VACSERA) - قطاع الشؤون الفنية والرقابة المعملية &copy; 2026</p>
+  </footer>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- Device Form Modal (Add / Edit) -->
+  <div id="deviceModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeDeviceModal()"></div>
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto z-10">
+      <div class="flex items-center justify-between border-b pb-3 mb-4">
+        <h3 id="modalTitle" class="text-base sm:text-lg font-black text-slate-800">إضافة جهاز طبي جديد</h3>
+        <button onclick="closeDeviceModal()" class="text-slate-400 hover:text-slate-600 text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="deviceForm" onsubmit="saveDevice(event)" class="space-y-4">
+        <input type="hidden" id="editDeviceId">
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">اسم الجهاز والطراز <span class="text-red-500">*</span></label>
+          <input type="text" id="devName" required placeholder="مثال: Biosafety Cabinet Class II" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">الشركة المصنعة <span class="text-red-500">*</span></label>
+            <input type="text" id="devBrand" required placeholder="مثال: Thermo Fisher, Bio-Rad" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">الرقم التسلسلي S/N <span class="text-red-500">*</span></label>
+            <input type="text" id="devSN" required placeholder="مثال: SN-PCR-2024-09" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red font-mono">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">المعمل <span class="text-red-500">*</span></label>
+            <select id="devLab" required class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red font-bold">
+              <option value="AFP">معمل 1 (AFP)</option>
+              <option value="ENV">معمل 2 (ENV)</option>
+              <option value="PCR">معمل 3 (PCR)</option>
+              <option value="C.C">معمل 4 (C.C)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">الحالة التشغيلية <span class="text-red-500">*</span></label>
+            <select id="devStatus" required class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+              <option value="سليم">يعمل بكفاءة</option>
+              <option value="صيانة">تحت الصيانة</option>
+              <option value="خارج الخدمة">خارج الخدمة</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">تاريخ آخر فحص / صيانة <span class="text-red-500">*</span></label>
+            <input type="date" id="devLastDate" required class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">دورية الفحص الدوري</label>
+            <select id="devInterval" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+              <option value="1">شهري (كل شهر)</option>
+              <option value="3">كل 3 شهور</option>
+              <option value="6" selected>كل 6 شهور (نصف سنوي)</option>
+              <option value="12">سنوي (كل سنة)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">ملاحظات الفحص والتشغيل</label>
+          <textarea id="devNotes" rows="2" placeholder="ملاحظات المعايرة، فلاتر الهواء، صلاحية الكواشف..." class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red resize-none"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t">
+          <button type="button" onclick="closeDeviceModal()" class="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200">إلغاء</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-vacsera-red hover:bg-vacsera-redDark shadow-sm">حفظ الجهاز</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Quick Inspection Modal -->
+  <div id="inspectModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeInspectModal()"></div>
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative z-10">
+      <div class="flex items-center justify-between border-b pb-3 mb-4">
+        <div>
+          <h3 class="text-base font-black text-slate-800">تسجيل كشف / صيانة دورية</h3>
+          <p id="inspectDeviceName" class="text-xs text-vacsera-red font-bold"></p>
+        </div>
+        <button onclick="closeInspectModal()" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="inspectForm" onsubmit="saveInspection(event)" class="space-y-3">
+        <input type="hidden" id="inspectDeviceId">
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">تاريخ الفحص الجديد</label>
+          <input type="date" id="inspDate" required class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">نوع الإجراء</label>
+          <select id="inspType" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red font-medium">
+            <option value="صيانة دورية وقائية">صيانة دورية وقائية</option>
+            <option value="معايرة دقيقة (Calibration)">معايرة دقيقة (Calibration)</option>
+            <option value="إصلاح عطل وتغيير قطع غيار">إصلاح عطل وتغيير قطع غيار</option>
+            <option value="فحص جودة روتيني">فحص جودة روتيني</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">اسم المهندس / الفاحص المسؤول</label>
+          <input type="text" id="inspInspector" required placeholder="اسم المهندس أو الفني" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">حالة الجهاز بعد الفحص</label>
+          <select id="inspStatus" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red font-medium">
+            <option value="سليم">يعمل بكفاءة</option>
+            <option value="صيانة">يحتاج متابعة / تحت الصيانة</option>
+            <option value="خارج الخدمة">خارج الخدمة</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">تقرير الفحص والملاحظات</label>
+          <textarea id="inspNotes" rows="2" placeholder="تم استبدال الفلتر، الجهاز يعمل ضمن المعايير..." class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red resize-none"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t">
+          <button type="button" onclick="closeInspectModal()" class="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200">إلغاء</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm">تأكيد وحفظ الكشف</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- History Log Modal -->
+  <div id="historyModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeHistoryModal()"></div>
+    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl relative max-h-[85vh] flex flex-col z-10">
+      <div class="flex items-center justify-between border-b pb-3 mb-4">
+        <div>
+          <h3 class="text-base font-black text-slate-800">سجل الفحوصات والصيانة التراكمي</h3>
+          <p id="historyDeviceTitle" class="text-xs text-vacsera-red font-bold"></p>
+        </div>
+        <button onclick="closeHistoryModal()" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="overflow-y-auto flex-1 pr-1 space-y-3" id="historyTimeline">
+        <!-- History items rendered here -->
+      </div>
+
+      <div class="pt-3 border-t mt-4 text-left">
+        <button onclick="closeHistoryModal()" class="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- QR Asset Tag Modal (Ready to Print) -->
+  <div id="qrModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeQRModal()"></div>
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl relative z-10">
+      <div class="flex items-center justify-between border-b pb-3 mb-4 no-print">
+        <h3 class="text-base font-black text-slate-800">بطاقة تعريف الجهاز (Asset Tag)</h3>
+        <button onclick="closeQRModal()" class="text-slate-400 hover:text-slate-600">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Printable Card Box -->
+      <div id="printModalContent" class="border-2 border-black p-4 rounded-xl bg-white text-center">
+        <div class="flex items-center justify-between border-b-2 border-black pb-2 mb-2">
+          <div class="text-right">
+            <span class="text-[10px] font-black uppercase text-red-600 tracking-wider">VACSERA POLIO LABS</span>
+            <div id="qrLabName" class="text-xs font-black text-black">معمل PCR</div>
+          </div>
+          <div class="text-[10px] font-bold text-slate-600">MEDICAL ASSET</div>
+        </div>
+
+        <div id="qrContainer" class="flex justify-center my-3"></div>
+
+        <div class="text-right space-y-1">
+          <div class="text-xs font-black text-slate-900" id="qrDevName">Real-Time PCR System</div>
+          <div class="text-[11px] font-mono font-bold text-slate-700">S/N: <span id="qrDevSN">SN-PCR-8821</span></div>
+          <div class="text-[10px] text-slate-500">الشركة: <span id="qrDevBrand">Bio-Rad Laboratories</span></div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 mt-4 pt-3 border-t no-print">
+        <button onclick="closeQRModal()" class="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">إغلاق</button>
+        <button onclick="window.print()" class="px-4 py-2 text-xs font-bold text-white bg-vacsera-black hover:bg-black rounded-xl flex items-center gap-1 shadow-sm">
+          <i class="fa-solid fa-print"></i>
+          <span>طباعة البطاقة</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Logic -->
+  <script>
+    const STORAGE_KEY = 'vacsera_polio_medical_devices_v2';
+
+    const initialDevices = [
+      {
+        id: '1',
+        name: 'Real-Time PCR System CFX96',
+        brand: 'Bio-Rad Laboratories',
+        sn: 'CFX96-VAC-0041',
+        lab: 'PCR',
+        intervalMonths: 3,
+        lastDate: '2026-09-15',
+        status: 'سليم',
+        notes: 'تمت المعايرة الضوئية الشاملة واستبدال اللمبة بنجاح.',
+        history: [
+          { date: '2026-09-15', inspector: 'م. أحمد حمدي', type: 'معايرة دقيقة (Calibration)', notes: 'معايرة ضوئية وفحص كفاءة القنوات' },
+          { date: '2026-06-10', inspector: 'م. شريف عادل', type: 'صيانة دورية وقائية', notes: 'تنظيف كتل التسخين والتهوية' }
+        ]
+      },
+      {
+        id: '2',
+        name: 'كابينة أمان حيوي Class II Biosafety Cabinet',
+        brand: 'Thermo Fisher Scientific',
+        sn: 'BSC-1300-ENV-12',
+        lab: 'ENV',
+        intervalMonths: 6,
+        lastDate: '2026-04-10',
+        status: 'سليم',
+        notes: 'فحص سرعة سريان الهواء وتغيير فلتر HEPA.',
+        history: [
+          { date: '2026-04-10', inspector: 'م. محمد فتحي', type: 'صيانة دورية وقائية', notes: 'اختبار كفاءة فلتر الـ HEPA وتدفق الهواء' }
+        ]
+      },
+      {
+        id: '3',
+        name: 'CO2 Incubator لحضانة الخلايا',
+        brand: 'Eppendorf',
+        sn: 'INC-CO2-CC-88',
+        lab: 'C.C',
+        intervalMonths: 3,
+        lastDate: '2026-10-05',
+        status: 'سليم',
+        notes: 'ضبط حساس الـ CO2 وحرارة 37 درجة مئوية.',
+        history: [
+          { date: '2026-10-05', inspector: 'م. خالد كمال', type: 'معايرة دقيقة (Calibration)', notes: 'معايرة حساس غاز CO2 ومستوى الرطوبة' }
+        ]
+      },
+      {
+        id: '4',
+        name: 'جهاز طرد مركزي مبرد Refrigerated Centrifuge',
+        brand: 'Beckman Coulter',
+        sn: 'BC-CENT-AFP-03',
+        lab: 'AFP',
+        intervalMonths: 6,
+        lastDate: '2026-03-01',
+        status: 'صيانة',
+        notes: 'صوت غير طبيعي في الموتور وتذبذب في التبريد.',
+        history: [
+          { date: '2026-03-01', inspector: 'م. كريم محمود', type: 'فحص جودة روتيني', notes: 'تم رصد اهتزاز، في انتظار قطع الغيار' }
+        ]
+      }
+    ];
+
+    let devices = [];
+    let currentFilterCard = 'ALL';
+
+    function getNextDueDate(lastDateStr, intervalMonths) {
+      if (!lastDateStr) return null;
+      const d = new Date(lastDateStr);
+      d.setMonth(d.getMonth() + parseInt(intervalMonths || 6));
+      return d;
+    }
+
+    function getDueStatus(device) {
+      const nextDate = getNextDueDate(device.lastDate, device.intervalMonths);
+      if (!nextDate) return { text: 'غير محدد', class: 'bg-slate-100 text-slate-700', isOverdue: false, isUpcoming: false };
+      
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      nextDate.setHours(0,0,0,0);
+
+      const diffTime = nextDate - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays < 0) {
+        return { text: `متأخر (${Math.abs(diffDays)} يوم)`, class: 'bg-red-100 text-red-700 border border-red-200', isOverdue: true, isUpcoming: false, nextDateStr: nextDate.toISOString().split('T')[0] };
+      } else if (diffDays <= 14) {
+        return { text: `مستحق خلال ${diffDays} يوم`, class: 'bg-amber-100 text-amber-800 border border-amber-200', isOverdue: false, isUpcoming: true, nextDateStr: nextDate.toISOString().split('T')[0] };
+      } else {
+        return { text: 'سارٍ', class: 'bg-emerald-50 text-emerald-700', isOverdue: false, isUpcoming: false, nextDateStr: nextDate.toISOString().split('T')[0] };
+      }
+    }
+
+    function loadDevices() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          devices = JSON.parse(saved);
+        } catch (e) {
+          devices = initialDevices;
+        }
+      } else {
+        devices = initialDevices;
+        saveToStorage();
+      }
+      
+      const customLogo = localStorage.getItem('vacsera_custom_logo');
+      if (customLogo) {
+        renderCustomLogo(customLogo);
+      }
+      
+      updateStats();
+      renderTable();
+    }
+
+    function saveToStorage() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(devices));
+      updateStats();
+    }
+
+    function updateStats() {
+      document.getElementById('statTotal').innerText = devices.length;
+      document.getElementById('statOperational').innerText = devices.filter(d => d.status === 'سليم').length;
+      document.getElementById('statMaintenance').innerText = devices.filter(d => d.status === 'صيانة').length;
+      document.getElementById('statOut').innerText = devices.filter(d => d.status === 'خارج الخدمة').length;
+
+      let overdueCount = 0;
+      let upcomingCount = 0;
+      devices.forEach(d => {
+        const status = getDueStatus(d);
+        if (status.isOverdue) overdueCount++;
+        if (status.isUpcoming) upcomingCount++;
+      });
+      document.getElementById('statOverdue').innerText = overdueCount;
+      document.getElementById('statUpcoming').innerText = upcomingCount;
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('devicesTableBody');
+      const search = document.getElementById('searchInput').value.trim().toLowerCase();
+      const lab = document.getElementById('labFilter').value;
+      const statusFilter = document.getElementById('statusFilter').value;
+      const overdueOnly = document.getElementById('overdueOnly').checked;
+
+      tbody.innerHTML = '';
+
+      const filtered = devices.filter(device => {
+        const matchesSearch = !search || 
+          device.name.toLowerCase().includes(search) || 
+          device.brand.toLowerCase().includes(search) || 
+          device.sn.toLowerCase().includes(search);
+
+        const matchesLab = lab === 'ALL' || device.lab === lab;
+        const matchesStatus = statusFilter === 'ALL' || device.status === statusFilter;
+        
+        const dueInfo = getDueStatus(device);
+        let matchesOverdue = true;
+        if (overdueOnly) {
+          matchesOverdue = dueInfo.isOverdue;
+        }
+
+        if (currentFilterCard === 'OPERATIONAL') return matchesSearch && matchesLab && matchesStatus && device.status === 'سليم';
+        if (currentFilterCard === 'MAINTENANCE') return matchesSearch && matchesLab && matchesStatus && device.status === 'صيانة';
+        if (currentFilterCard === 'OUT') return matchesSearch && matchesLab && matchesStatus && device.status === 'خارج الخدمة';
+        if (currentFilterCard === 'OVERDUE') return matchesSearch && matchesLab && matchesStatus && dueInfo.isOverdue;
+        if (currentFilterCard === 'UPCOMING') return matchesSearch && matchesLab && matchesStatus && dueInfo.isUpcoming;
+
+        return matchesSearch && matchesLab && matchesStatus && matchesOverdue;
+      });
+
+      document.getElementById('displayedCount').innerText = filtered.length;
+
+      if (filtered.length === 0) {
+        document.getElementById('emptyState').classList.remove('hidden');
+      } else {
+        document.getElementById('emptyState').classList.add('hidden');
+      }
+
+      filtered.forEach(device => {
+        const due = getDueStatus(device);
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+
+        let labBadge = '';
+        if (device.lab === 'AFP') labBadge = '<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full text-xs font-bold">معمل 1 (AFP)</span>';
+        else if (device.lab === 'ENV') labBadge = '<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full text-xs font-bold">معمل 2 (ENV)</span>';
+        else if (device.lab === 'PCR') labBadge = '<span class="bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-0.5 rounded-full text-xs font-bold">معمل 3 (PCR)</span>';
+        else if (device.lab === 'C.C') labBadge = '<span class="bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 rounded-full text-xs font-bold">معمل 4 (C.C)</span>';
+
+        let statusBadge = '';
+        if (device.status === 'سليم') statusBadge = '<span class="inline-flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full font-bold text-xs"><i class="fa-solid fa-circle-check text-[10px]"></i> كفاءة</span>';
+        else if (device.status === 'صيانة') statusBadge = '<span class="inline-flex items-center gap-1 text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full font-bold text-xs"><i class="fa-solid fa-screwdriver-wrench text-[10px]"></i> صيانة</span>';
+        else statusBadge = '<span class="inline-flex items-center gap-1 text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full font-bold text-xs"><i class="fa-solid fa-ban text-[10px]"></i> معطل</span>';
+
+        tr.innerHTML = `
+          <td class="py-3.5 px-4 font-bold text-slate-900">
+            <div>${device.name}</div>
+            <div class="text-[11px] text-slate-400 font-normal sm:hidden font-mono">${device.sn}</div>
+          </td>
+          <td class="py-3.5 px-4 text-slate-600 font-semibold">${device.brand}</td>
+          <td class="py-3.5 px-4 font-mono font-bold text-slate-700 text-xs">${device.sn}</td>
+          <td class="py-3.5 px-4">${labBadge}</td>
+          <td class="py-3.5 px-4 text-slate-600 text-xs">${device.lastDate || '—'}</td>
+          <td class="py-3.5 px-4">
+            <span class="text-xs px-2.5 py-1 rounded-lg font-bold ${due.class}">
+              ${due.nextDateStr || ''} (${due.text})
+            </span>
+          </td>
+          <td class="py-3.5 px-4 text-center">${statusBadge}</td>
+          <td class="py-3.5 px-4 text-center">
+            <div class="flex items-center justify-center gap-1">
+              <button onclick="openInspectModal('${device.id}')" title="تسجيل كشف دوري جديد" class="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition">
+                <i class="fa-solid fa-stethoscope"></i>
+              </button>
+              <button onclick="openQRModal('${device.id}')" title="طباعة باركود وبطاقة الجهاز" class="p-2 text-slate-700 hover:bg-slate-100 rounded-lg transition">
+                <i class="fa-solid fa-qrcode"></i>
+              </button>
+              <button onclick="openHistoryModal('${device.id}')" title="سجل صيانة الجهاز" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+              </button>
+              <button onclick="editDevice('${device.id}')" title="تعديل الجهاز" class="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
+              <button onclick="deleteDevice('${device.id}')" title="حذف" class="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterByCard(cardType) {
+      currentFilterCard = cardType;
+      document.getElementById('overdueOnly').checked = (cardType === 'OVERDUE');
+      renderTable();
+    }
+
+    function openDeviceModal(device = null) {
+      const modal = document.getElementById('deviceModal');
+      const form = document.getElementById('deviceForm');
+      form.reset();
+
+      if (device) {
+        document.getElementById('modalTitle').innerText = 'تعديل بيانات الجهاز';
+        document.getElementById('editDeviceId').value = device.id;
+        document.getElementById('devName').value = device.name;
+        document.getElementById('devBrand').value = device.brand;
+        document.getElementById('devSN').value = device.sn;
+        document.getElementById('devLab').value = device.lab;
+        document.getElementById('devStatus').value = device.status;
+        document.getElementById('devLastDate').value = device.lastDate;
+        document.getElementById('devInterval').value = device.intervalMonths || 6;
+        document.getElementById('devNotes').value = device.notes || '';
+      } else {
+        document.getElementById('modalTitle').innerText = 'إضافة جهاز طبي جديد';
+        document.getElementById('editDeviceId').value = '';
+        document.getElementById('devLastDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('devInterval').value = '6';
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeDeviceModal() {
+      document.getElementById('deviceModal').classList.add('hidden');
+    }
+
+    function editDevice(id) {
+      const dev = devices.find(d => d.id === id);
+      if (dev) openDeviceModal(dev);
+    }
+
+    function saveDevice(e) {
+      e.preventDefault();
+      const id = document.getElementById('editDeviceId').value;
+      const name = document.getElementById('devName').value.trim();
+      const brand = document.getElementById('devBrand').value.trim();
+      const sn = document.getElementById('devSN').value.trim();
+      const lab = document.getElementById('devLab').value;
+      const status = document.getElementById('devStatus').value;
+      const lastDate = document.getElementById('devLastDate').value;
+      const intervalMonths = parseInt(document.getElementById('devInterval').value);
+      const notes = document.getElementById('devNotes').value.trim();
+
+      if (id) {
+        const index = devices.findIndex(d => d.id === id);
+        if (index !== -1) {
+          devices[index] = {
+            ...devices[index],
+            name, brand, sn, lab, status, lastDate, intervalMonths, notes
+          };
+        }
+      } else {
+        const newDevice = {
+          id: Date.now().toString(),
+          name, brand, sn, lab, status, lastDate, intervalMonths, notes,
+          history: [
+            {
+              date: lastDate,
+              inspector: 'تسجيل مبدئي',
+              type: 'فحص استلام أولي',
+              notes: notes || 'تم تسجيل الجهاز بالمنظومة'
+            }
+          ]
+        };
+        devices.unshift(newDevice);
+      }
+
+      saveToStorage();
+      renderTable();
+      closeDeviceModal();
+    }
+
+    function deleteDevice(id) {
+      if (confirm('هل أنت متأكد من حذف هذا الجهاز وسجله من المنظومة؟')) {
+        devices = devices.filter(d => d.id !== id);
+        saveToStorage();
+        renderTable();
+      }
+    }
+
+    function openInspectModal(id) {
+      const dev = devices.find(d => d.id === id);
+      if (!dev) return;
+
+      document.getElementById('inspectDeviceId').value = dev.id;
+      document.getElementById('inspectDeviceName').innerText = `${dev.name} (${dev.sn}) - معمل ${dev.lab}`;
+      document.getElementById('inspDate').value = new Date().toISOString().split('T')[0];
+      document.getElementById('inspStatus').value = dev.status;
+      document.getElementById('inspInspector').value = '';
+      document.getElementById('inspNotes').value = '';
+
+      document.getElementById('inspectModal').classList.remove('hidden');
+    }
+
+    function closeInspectModal() {
+      document.getElementById('inspectModal').classList.add('hidden');
+    }
+
+    function saveInspection(e) {
+      e.preventDefault();
+      const id = document.getElementById('inspectDeviceId').value;
+      const inspDate = document.getElementById('inspDate').value;
+      const inspType = document.getElementById('inspType').value;
+      const inspector = document.getElementById('inspInspector').value.trim();
+      const status = document.getElementById('inspStatus').value;
+      const notes = document.getElementById('inspNotes').value.trim();
+
+      const devIndex = devices.findIndex(d => d.id === id);
+      if (devIndex !== -1) {
+        devices[devIndex].lastDate = inspDate;
+        devices[devIndex].status = status;
+        if (notes) devices[devIndex].notes = notes;
+
+        if (!devices[devIndex].history) devices[devIndex].history = [];
+        devices[devIndex].history.unshift({
+          date: inspDate,
+          type: inspType,
+          inspector: inspector,
+          notes: notes
+        });
+
+        saveToStorage();
+        renderTable();
+        closeInspectModal();
+      }
+    }
+
+    function openHistoryModal(id) {
+      const dev = devices.find(d => d.id === id);
+      if (!dev) return;
+
+      document.getElementById('historyDeviceTitle').innerText = `${dev.name} [S/N: ${dev.sn}] - معمل ${dev.lab}`;
+      const container = document.getElementById('historyTimeline');
+      container.innerHTML = '';
+
+      const history = dev.history || [];
+      if (history.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">لا توجد سجلات كشف سابقة مسجلة لهذا الجهاز.</p>';
+      } else {
+        history.forEach(item => {
+          const div = document.createElement('div');
+          div.className = "border-r-2 border-vacsera-red pr-3 py-1 space-y-1 relative";
+          div.innerHTML = `
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black text-slate-800">${item.type || 'فحص دوري'}</span>
+              <span class="text-[11px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">${item.date}</span>
+            </div>
+            <div class="text-xs text-slate-600"><span class="font-bold">القائم بالفحص:</span> ${item.inspector || 'مهندس الصيانة'}</div>
+            ${item.notes ? `<div class="text-xs text-slate-500 bg-slate-50 p-2 rounded-lg">${item.notes}</div>` : ''}
+          `;
+          container.appendChild(div);
+        });
+      }
+
+      document.getElementById('historyModal').classList.remove('hidden');
+    }
+
+    function closeHistoryModal() {
+      document.getElementById('historyModal').classList.add('hidden');
+    }
+
+    function openQRModal(id) {
+      const dev = devices.find(d => d.id === id);
+      if (!dev) return;
+
+      document.getElementById('qrDevName').innerText = dev.name;
+      document.getElementById('qrDevSN').innerText = dev.sn;
+      document.getElementById('qrDevBrand').innerText = dev.brand;
+      document.getElementById('qrLabName').innerText = `معمل ${dev.lab}`;
+
+      const container = document.getElementById('qrContainer');
+      container.innerHTML = '';
+
+      const qrData = `VACSERA|POLIO|${dev.lab}|SN:${dev.sn}|NAME:${dev.name}`;
+      new QRCode(container, {
+        text: qrData,
+        width: 140,
+        height: 140,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+
+      document.getElementById('qrModal').classList.remove('hidden');
+    }
+
+    function closeQRModal() {
+      document.getElementById('qrModal').classList.add('hidden');
+    }
+
+    function handleLogoUpload(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const base64 = e.target.result;
+          localStorage.setItem('vacsera_custom_logo', base64);
+          renderCustomLogo(base64);
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function renderCustomLogo(src) {
+      document.getElementById('vacseraLogoContainer').innerHTML = `<img src="${src}" class="max-h-10 object-contain" alt="VACSERA">`;
+    }
+
+    function exportData() {
+      if (devices.length === 0) {
+        alert('لا توجد بيانات لتصديرها.');
+        return;
+      }
+
+      let csv = "\uFEFF";
+      csv += "اسم الجهاز,الشركة المصنعة,الرقم التسلسلي (S/N),المعمل,تاريخ آخر فحص,دورية الفحص (شهور),الفحص القادم,الحالة,ملاحظات\n";
+
+      devices.forEach(d => {
+        const next = getNextDueDate(d.lastDate, d.intervalMonths);
+        const nextDateStr = next ? next.toISOString().split('T')[0] : '';
+        const row = [
+          `"${(d.name || '').replace(/"/g, '""')}"`,
+          `"${(d.brand || '').replace(/"/g, '""')}"`,
+          `"${(d.sn || '').replace(/"/g, '""')}"`,
+          `"${d.lab || ''}"`,
+          `"${d.lastDate || ''}"`,
+          `"${d.intervalMonths || 6}"`,
+          `"${nextDateStr}"`,
+          `"${d.status || ''}"`,
+          `"${(d.notes || '').replace(/"/g, '""')}"`
+        ];
+        csv += row.join(",") + "\n";
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `VACSERA_Polio_Devices_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function importCSV(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const text = evt.target.result;
+        const lines = text.split('\n').filter(line => line.trim().length > 0);
+        if (lines.length <= 1) {
+          alert('الملف فارغ أو غير متوافق.');
+          return;
+        }
+
+        let importedCount = 0;
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
+          if (cols.length >= 4 && cols[0]) {
+            const name = cols[0];
+            const brand = cols[1] || 'غير محدد';
+            const sn = cols[2] || `SN-IMP-${Date.now()}-${i}`;
+            const lab = cols[3] || 'PCR';
+            const lastDate = cols[4] || new Date().toISOString().split('T')[0];
+            const interval = parseInt(cols[5]) || 6;
+            const status = cols[7] || 'سليم';
+            const notes = cols[8] || '';
+
+            devices.unshift({
+              id: `${Date.now()}_${i}`,
+              name, brand, sn, lab, lastDate,
+              intervalMonths: interval,
+              status, notes,
+              history: [{ date: lastDate, inspector: 'استيراد إكسيل', type: 'استيراد بيانات', notes: 'تم استيراد الجهاز من ملف CSV' }]
+            });
+            importedCount++;
+          }
+        }
+
+        saveToStorage();
+        renderTable();
+        alert(`تم استيراد ${importedCount} جهاز بنجاح إلى قاعدة البيانات!`);
+        e.target.value = '';
+      };
+      reader.readAsText(file);
+    }
+
+    window.addEventListener('DOMContentLoaded', loadDevices);
+  </script>
+</body>
+</html>
