@@ -15,6 +15,10 @@
   <!-- QRCode.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
+  <!-- Firebase App & Firestore SDKs (Compat version for browser script) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
   <script>
     tailwind.config = {
       theme: {
@@ -99,6 +103,9 @@
           <div class="flex items-center gap-2">
             <span class="bg-vacsera-red text-white text-xs font-black px-2.5 py-0.5 rounded tracking-wider">POLIO</span>
             <h1 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight">نظام إدارة ومتابعة الأجهزة الطبية</h1>
+            <span id="cloudStatusBadge" class="bg-emerald-100 text-emerald-700 text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> سحابي متصل
+            </span>
           </div>
           <p class="text-xs text-slate-500 font-medium">الشركة المصرية لإنتاج الأمصال واللقاحات والأدوية (فاكسيرا - VACSERA)</p>
         </div>
@@ -461,13 +468,25 @@
     </div>
   </div>
 
-  <!-- Application Logic -->
+  <!-- Application Logic & Firebase Integration -->
   <script>
-    const STORAGE_KEY = 'vacsera_polio_medical_devices_v2';
+    // Firebase Configuration from your Project
+    const firebaseConfig = {
+      apiKey: "AIzaSyAkQWZF1tV-ss8jVmSFq31yz_FSBHCyGdg",
+      authDomain: "vacsera-polio.firebaseapp.com",
+      projectId: "vacsera-polio",
+      storageBucket: "vacsera-polio.firebasestorage.app",
+      messagingSenderId: "133187376012",
+      appId: "1:133187376012:web:93632e11927ad8ee07bca9"
+    };
+
+    // Initialize Firebase & Firestore
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const COLLECTION_NAME = "polio_devices";
 
     const initialDevices = [
       {
-        id: '1',
         name: 'Real-Time PCR System CFX96',
         brand: 'Bio-Rad Laboratories',
         sn: 'CFX96-VAC-0041',
@@ -482,7 +501,6 @@
         ]
       },
       {
-        id: '2',
         name: 'كابينة أمان حيوي Class II Biosafety Cabinet',
         brand: 'Thermo Fisher Scientific',
         sn: 'BSC-1300-ENV-12',
@@ -496,7 +514,6 @@
         ]
       },
       {
-        id: '3',
         name: 'CO2 Incubator لحضانة الخلايا',
         brand: 'Eppendorf',
         sn: 'INC-CO2-CC-88',
@@ -510,7 +527,6 @@
         ]
       },
       {
-        id: '4',
         name: 'جهاز طرد مركزي مبرد Refrigerated Centrifuge',
         brand: 'Beckman Coulter',
         sn: 'BC-CENT-AFP-03',
@@ -555,31 +571,43 @@
       }
     }
 
-    function loadDevices() {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        try {
-          devices = JSON.parse(saved);
-        } catch (e) {
-          devices = initialDevices;
+    // Real-time Cloud Firestore Listener
+    function initCloudSync() {
+      const badge = document.getElementById('cloudStatusBadge');
+
+      db.collection(COLLECTION_NAME).onSnapshot((snapshot) => {
+        if (snapshot.empty) {
+          // If Firestore is empty initially, seed it with sample initial data
+          initialDevices.forEach(dev => {
+            db.collection(COLLECTION_NAME).add(dev);
+          });
+          return;
         }
-      } else {
-        devices = initialDevices;
-        saveToStorage();
-      }
-      
+
+        devices = [];
+        snapshot.forEach((doc) => {
+          devices.push({ id: doc.id, ...doc.data() });
+        });
+
+        if (badge) {
+          badge.className = "bg-emerald-100 text-emerald-700 text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200";
+          badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> متزامن سحابياً';
+        }
+
+        updateStats();
+        renderTable();
+      }, (error) => {
+        console.error("Firestore sync error:", error);
+        if (badge) {
+          badge.className = "bg-rose-100 text-rose-700 text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-rose-200";
+          badge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> غير متصل بالسحابة';
+        }
+      });
+
       const customLogo = localStorage.getItem('vacsera_custom_logo');
       if (customLogo) {
         renderCustomLogo(customLogo);
       }
-      
-      updateStats();
-      renderTable();
-    }
-
-    function saveToStorage() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(devices));
-      updateStats();
     }
 
     function updateStats() {
@@ -610,9 +638,9 @@
 
       const filtered = devices.filter(device => {
         const matchesSearch = !search || 
-          device.name.toLowerCase().includes(search) || 
-          device.brand.toLowerCase().includes(search) || 
-          device.sn.toLowerCase().includes(search);
+          (device.name && device.name.toLowerCase().includes(search)) || 
+          (device.brand && device.brand.toLowerCase().includes(search)) || 
+          (device.sn && device.sn.toLowerCase().includes(search));
 
         const matchesLab = lab === 'ALL' || device.lab === lab;
         const matchesStatus = statusFilter === 'ALL' || device.status === statusFilter;
@@ -658,11 +686,11 @@
 
         tr.innerHTML = `
           <td class="py-3.5 px-4 font-bold text-slate-900">
-            <div>${device.name}</div>
-            <div class="text-[11px] text-slate-400 font-normal sm:hidden font-mono">${device.sn}</div>
+            <div>${device.name || ''}</div>
+            <div class="text-[11px] text-slate-400 font-normal sm:hidden font-mono">${device.sn || ''}</div>
           </td>
-          <td class="py-3.5 px-4 text-slate-600 font-semibold">${device.brand}</td>
-          <td class="py-3.5 px-4 font-mono font-bold text-slate-700 text-xs">${device.sn}</td>
+          <td class="py-3.5 px-4 text-slate-600 font-semibold">${device.brand || ''}</td>
+          <td class="py-3.5 px-4 font-mono font-bold text-slate-700 text-xs">${device.sn || ''}</td>
           <td class="py-3.5 px-4">${labBadge}</td>
           <td class="py-3.5 px-4 text-slate-600 text-xs">${device.lastDate || '—'}</td>
           <td class="py-3.5 px-4">
@@ -710,12 +738,12 @@
       if (device) {
         document.getElementById('modalTitle').innerText = 'تعديل بيانات الجهاز';
         document.getElementById('editDeviceId').value = device.id;
-        document.getElementById('devName').value = device.name;
-        document.getElementById('devBrand').value = device.brand;
-        document.getElementById('devSN').value = device.sn;
-        document.getElementById('devLab').value = device.lab;
-        document.getElementById('devStatus').value = device.status;
-        document.getElementById('devLastDate').value = device.lastDate;
+        document.getElementById('devName').value = device.name || '';
+        document.getElementById('devBrand').value = device.brand || '';
+        document.getElementById('devSN').value = device.sn || '';
+        document.getElementById('devLab').value = device.lab || 'PCR';
+        document.getElementById('devStatus').value = device.status || 'سليم';
+        document.getElementById('devLastDate').value = device.lastDate || '';
         document.getElementById('devInterval').value = device.intervalMonths || 6;
         document.getElementById('devNotes').value = device.notes || '';
       } else {
@@ -737,7 +765,7 @@
       if (dev) openDeviceModal(dev);
     }
 
-    function saveDevice(e) {
+    async function saveDevice(e) {
       e.preventDefault();
       const id = document.getElementById('editDeviceId').value;
       const name = document.getElementById('devName').value.trim();
@@ -749,40 +777,37 @@
       const intervalMonths = parseInt(document.getElementById('devInterval').value);
       const notes = document.getElementById('devNotes').value.trim();
 
-      if (id) {
-        const index = devices.findIndex(d => d.id === id);
-        if (index !== -1) {
-          devices[index] = {
-            ...devices[index],
-            name, brand, sn, lab, status, lastDate, intervalMonths, notes
-          };
-        }
-      } else {
-        const newDevice = {
-          id: Date.now().toString(),
-          name, brand, sn, lab, status, lastDate, intervalMonths, notes,
-          history: [
+      const deviceData = {
+        name, brand, sn, lab, status, lastDate, intervalMonths, notes
+      };
+
+      try {
+        if (id) {
+          await db.collection(COLLECTION_NAME).doc(id).update(deviceData);
+        } else {
+          deviceData.history = [
             {
               date: lastDate,
               inspector: 'تسجيل مبدئي',
               type: 'فحص استلام أولي',
               notes: notes || 'تم تسجيل الجهاز بالمنظومة'
             }
-          ]
-        };
-        devices.unshift(newDevice);
+          ];
+          await db.collection(COLLECTION_NAME).add(deviceData);
+        }
+        closeDeviceModal();
+      } catch (err) {
+        alert('حدث خطأ أثناء الحفظ السحابي: ' + err.message);
       }
-
-      saveToStorage();
-      renderTable();
-      closeDeviceModal();
     }
 
-    function deleteDevice(id) {
+    async function deleteDevice(id) {
       if (confirm('هل أنت متأكد من حذف هذا الجهاز وسجله من المنظومة؟')) {
-        devices = devices.filter(d => d.id !== id);
-        saveToStorage();
-        renderTable();
+        try {
+          await db.collection(COLLECTION_NAME).doc(id).delete();
+        } catch (err) {
+          alert('حدث خطأ أثناء الحذف: ' + err.message);
+        }
       }
     }
 
@@ -804,7 +829,7 @@
       document.getElementById('inspectModal').classList.add('hidden');
     }
 
-    function saveInspection(e) {
+    async function saveInspection(e) {
       e.preventDefault();
       const id = document.getElementById('inspectDeviceId').value;
       const inspDate = document.getElementById('inspDate').value;
@@ -813,23 +838,30 @@
       const status = document.getElementById('inspStatus').value;
       const notes = document.getElementById('inspNotes').value.trim();
 
-      const devIndex = devices.findIndex(d => d.id === id);
-      if (devIndex !== -1) {
-        devices[devIndex].lastDate = inspDate;
-        devices[devIndex].status = status;
-        if (notes) devices[devIndex].notes = notes;
+      const dev = devices.find(d => d.id === id);
+      if (!dev) return;
 
-        if (!devices[devIndex].history) devices[devIndex].history = [];
-        devices[devIndex].history.unshift({
+      const currentHistory = dev.history || [];
+      const updatedHistory = [
+        {
           date: inspDate,
           type: inspType,
           inspector: inspector,
           notes: notes
-        });
+        },
+        ...currentHistory
+      ];
 
-        saveToStorage();
-        renderTable();
+      try {
+        await db.collection(COLLECTION_NAME).doc(id).update({
+          lastDate: inspDate,
+          status: status,
+          notes: notes || dev.notes || '',
+          history: updatedHistory
+        });
         closeInspectModal();
+      } catch (err) {
+        alert('خطأ أثناء حفظ الفحص: ' + err.message);
       }
     }
 
@@ -954,7 +986,7 @@
       if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = function(evt) {
+      reader.onload = async function(evt) {
         const text = evt.target.result;
         const lines = text.split('\n').filter(line => line.trim().length > 0);
         if (lines.length <= 1) {
@@ -963,6 +995,8 @@
         }
 
         let importedCount = 0;
+        const batch = db.batch();
+
         for (let i = 1; i < lines.length; i++) {
           const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
           if (cols.length >= 4 && cols[0]) {
@@ -975,8 +1009,8 @@
             const status = cols[7] || 'سليم';
             const notes = cols[8] || '';
 
-            devices.unshift({
-              id: `${Date.now()}_${i}`,
+            const docRef = db.collection(COLLECTION_NAME).doc();
+            batch.set(docRef, {
               name, brand, sn, lab, lastDate,
               intervalMonths: interval,
               status, notes,
@@ -986,15 +1020,18 @@
           }
         }
 
-        saveToStorage();
-        renderTable();
-        alert(`تم استيراد ${importedCount} جهاز بنجاح إلى قاعدة البيانات!`);
+        try {
+          await batch.commit();
+          alert(`تم استيراد ${importedCount} جهاز بنجاح وحفظها سحابياً!`);
+        } catch (err) {
+          alert('خطأ أثناء الاستيراد السحابي: ' + err.message);
+        }
         e.target.value = '';
       };
       reader.readAsText(file);
     }
 
-    window.addEventListener('DOMContentLoaded', loadDevices);
+    window.addEventListener('DOMContentLoaded', initCloudSync);
   </script>
 </body>
 </html>
