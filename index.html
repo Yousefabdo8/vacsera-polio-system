@@ -333,6 +333,30 @@
           </div>
         </div>
 
+        <!-- المعايرة والقياسات الفنية المعملية -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+          <div class="text-xs font-bold text-slate-800 flex items-center gap-1.5 border-b pb-1.5">
+            <i class="fa-solid fa-sliders text-vacsera-red"></i>
+            <span>بيانات المعايرة والقياس (Calibration & Measurement Specs)</span>
+          </div>
+          
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">معايير المعايرة (Calibration Parameters)</label>
+            <input type="text" id="devCalibParams" placeholder="مثال: Temperature, Speed, CO2 %, Pressure..." class="w-full p-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-vacsera-red">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">المدى والدقة (Measurement Range / Accuracy)</label>
+              <input type="text" id="devRangeAccuracy" placeholder="مثال: 0 to 100 °C / ±0.5 °C" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-vacsera-red font-mono">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">القياس المطلوب / نسبة السماح (Measurement Required / Tolerance)</label>
+              <input type="text" id="devTolerance" placeholder="مثال: 37 °C ± 1 °C" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-vacsera-red font-mono">
+            </div>
+          </div>
+        </div>
+
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">ملاحظات الفحص والتشغيل</label>
           <textarea id="devNotes" rows="2" placeholder="ملاحظات المعايرة، فلاتر الهواء، صلاحية الكواشف..." class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red resize-none"></textarea>
@@ -690,10 +714,18 @@
         else if (device.status === 'صيانة') statusBadge = '<span class="inline-flex items-center gap-1 text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full font-bold text-xs"><i class="fa-solid fa-screwdriver-wrench text-[10px]"></i> صيانة</span>';
         else statusBadge = '<span class="inline-flex items-center gap-1 text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full font-bold text-xs"><i class="fa-solid fa-ban text-[10px]"></i> معطل</span>';
 
+        const calibInfoHtml = (device.calibParams || device.rangeAccuracy || device.tolerance) ? `
+          <div class="mt-1 flex flex-wrap gap-1 text-[10px] font-normal text-slate-500">
+            ${device.calibParams ? `<span class="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200"><i class="fa-solid fa-sliders text-slate-400 ml-1"></i>${device.calibParams}</span>` : ''}
+            ${device.rangeAccuracy ? `<span class="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-mono">Range: ${device.rangeAccuracy}</span>` : ''}
+            ${device.tolerance ? `<span class="bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded border border-sky-200 font-mono">Tol: ${device.tolerance}</span>` : ''}
+          </div>` : '';
+
         tr.innerHTML = `
           <td class="py-3.5 px-4 font-bold text-slate-900">
             <div>${device.name || ''}</div>
             <div class="text-[11px] text-slate-400 font-normal sm:hidden font-mono">${device.sn || ''}</div>
+            ${calibInfoHtml}
           </td>
           <td class="py-3.5 px-4 text-slate-600 font-semibold">${device.brand || ''}</td>
           <td class="py-3.5 px-4 font-mono font-bold text-slate-700 text-xs">${device.sn || ''}</td>
@@ -751,12 +783,18 @@
         document.getElementById('devStatus').value = device.status || 'سليم';
         document.getElementById('devLastDate').value = device.lastDate || '';
         document.getElementById('devInterval').value = device.intervalMonths || 6;
+        document.getElementById('devCalibParams').value = device.calibParams || '';
+        document.getElementById('devRangeAccuracy').value = device.rangeAccuracy || '';
+        document.getElementById('devTolerance').value = device.tolerance || '';
         document.getElementById('devNotes').value = device.notes || '';
       } else {
         document.getElementById('modalTitle').innerText = 'إضافة جهاز طبي جديد';
         document.getElementById('editDeviceId').value = '';
         document.getElementById('devLastDate').value = new Date().toISOString().split('T')[0];
         document.getElementById('devInterval').value = '6';
+        document.getElementById('devCalibParams').value = '';
+        document.getElementById('devRangeAccuracy').value = '';
+        document.getElementById('devTolerance').value = '';
       }
 
       modal.classList.remove('hidden');
@@ -782,10 +820,13 @@
       const lastDate = document.getElementById('devLastDate').value;
       const rawInterval = document.getElementById('devInterval').value;
       const intervalMonths = rawInterval === 'CNN' ? 'CNN' : (parseInt(rawInterval) || 6);
+      const calibParams = document.getElementById('devCalibParams').value.trim();
+      const rangeAccuracy = document.getElementById('devRangeAccuracy').value.trim();
+      const tolerance = document.getElementById('devTolerance').value.trim();
       const notes = document.getElementById('devNotes').value.trim();
 
       const deviceData = {
-        name, brand, sn, lab, status, lastDate, intervalMonths, notes
+        name, brand, sn, lab, status, lastDate, intervalMonths, calibParams, rangeAccuracy, tolerance, notes
       };
 
       try {
@@ -959,7 +1000,7 @@
       }
 
       let csv = "\uFEFF";
-      csv += "اسم الجهاز,الشركة المصنعة,الرقم التسلسلي (S/N),المعمل,تاريخ آخر فحص,دورية الفحص (شهور),الفحص القادم,الحالة,ملاحظات\n";
+      csv += "اسم الجهاز,الشركة المصنعة,الرقم التسلسلي (S/N),المعمل,معايير المعايرة (Calibration Parameters),المدى والدقة (Measurement Range / Accuracy),القياس المطلوب ونسبة السماح (Measurement Required / Tolerance),تاريخ آخر فحص,دورية الفحص (شهور),الفحص القادم,الحالة,ملاحظات\n";
 
       devices.forEach(d => {
         const next = getNextDueDate(d.lastDate, d.intervalMonths);
@@ -969,6 +1010,9 @@
           `"${(d.brand || '').replace(/"/g, '""')}"`,
           `"${(d.sn || '').replace(/"/g, '""')}"`,
           `"${d.lab || ''}"`,
+          `"${(d.calibParams || '').replace(/"/g, '""')}"`,
+          `"${(d.rangeAccuracy || '').replace(/"/g, '""')}"`,
+          `"${(d.tolerance || '').replace(/"/g, '""')}"`,
           `"${d.lastDate || ''}"`,
           `"${d.intervalMonths || 6}"`,
           `"${nextDateStr}"`,
