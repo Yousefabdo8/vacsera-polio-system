@@ -206,8 +206,6 @@
           <option value="ENV">معمل 2 (ENV)</option>
           <option value="PCR">معمل 3 (PCR)</option>
           <option value="C.C">معمل 4 (C.C)</option>
-          <option value="SEQ">معمل 5 (SEQ)</option>
-          <option value="CORRIDOR">الممر الرئيسي (Main Corridor)</option>
         </select>
 
         <!-- Status Filter -->
@@ -300,14 +298,12 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">المعمل / المكان <span class="text-red-500">*</span></label>
+            <label class="block text-xs font-bold text-slate-700 mb-1">المعمل <span class="text-red-500">*</span></label>
             <select id="devLab" required class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red font-bold">
               <option value="AFP">معمل 1 (AFP)</option>
               <option value="ENV">معمل 2 (ENV)</option>
               <option value="PCR">معمل 3 (PCR)</option>
               <option value="C.C">معمل 4 (C.C)</option>
-              <option value="SEQ">معمل 5 (SEQ)</option>
-              <option value="CORRIDOR">الممر الرئيسي (Main Corridor)</option>
             </select>
           </div>
           <div>
@@ -712,9 +708,6 @@
         else if (device.lab === 'ENV') labBadge = '<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full text-xs font-bold">معمل 2 (ENV)</span>';
         else if (device.lab === 'PCR') labBadge = '<span class="bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-0.5 rounded-full text-xs font-bold">معمل 3 (PCR)</span>';
         else if (device.lab === 'C.C') labBadge = '<span class="bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 rounded-full text-xs font-bold">معمل 4 (C.C)</span>';
-        else if (device.lab === 'SEQ') labBadge = '<span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full text-xs font-bold">معمل 5 (SEQ)</span>';
-        else if (device.lab === 'CORRIDOR') labBadge = '<span class="bg-slate-100 text-slate-700 border border-slate-300 px-2.5 py-0.5 rounded-full text-xs font-bold">الممر الرئيسي (Corridor)</span>';
-        else labBadge = `<span class="bg-slate-50 text-slate-700 border border-slate-200 px-2.5 py-0.5 rounded-full text-xs font-bold">${device.lab || 'عام'}</span>`;
 
         let statusBadge = '';
         if (device.status === 'سليم') statusBadge = '<span class="inline-flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full font-bold text-xs"><i class="fa-solid fa-circle-check text-[10px]"></i> كفاءة</span>';
@@ -822,18 +815,6 @@
       const name = document.getElementById('devName').value.trim();
       const brand = document.getElementById('devBrand').value.trim();
       const sn = document.getElementById('devSN').value.trim();
-
-      // التحقق من عدم تكرار الرقم التسلسلي (S/N)
-      const isDuplicate = devices.some(d => {
-        if (id && d.id === id) return false; // نفس الجهاز في حالة التعديل
-        return d.sn && d.sn.trim().toLowerCase() === sn.toLowerCase();
-      });
-
-      if (isDuplicate) {
-        alert(`عفواً! الرقم التسلسلي (S/N: ${sn}) مسجل مسبقاً لجهاز آخر في المنظومة. يرجى مراجعة الرقم.`);
-        document.getElementById('devSN').focus();
-        return;
-      }
       const lab = document.getElementById('devLab').value;
       const status = document.getElementById('devStatus').value;
       const lastDate = document.getElementById('devLastDate').value;
@@ -883,7 +864,7 @@
       if (!dev) return;
 
       document.getElementById('inspectDeviceId').value = dev.id;
-      document.getElementById('inspectDeviceName').innerText = `${dev.name} (${dev.sn}) - ${dev.lab === 'CORRIDOR' ? 'الممر الرئيسي' : 'معمل ' + dev.lab}`;
+      document.getElementById('inspectDeviceName').innerText = `${dev.name} (${dev.sn}) - معمل ${dev.lab}`;
       document.getElementById('inspDate').value = new Date().toISOString().split('T')[0];
       document.getElementById('inspStatus').value = dev.status;
       document.getElementById('inspInspector').value = '';
@@ -936,7 +917,7 @@
       const dev = devices.find(d => d.id === id);
       if (!dev) return;
 
-      document.getElementById('historyDeviceTitle').innerText = `${dev.name} [S/N: ${dev.sn}] - ${dev.lab === 'CORRIDOR' ? 'الممر الرئيسي' : 'معمل ' + dev.lab}`;
+      document.getElementById('historyDeviceTitle').innerText = `${dev.name} [S/N: ${dev.sn}] - معمل ${dev.lab}`;
       const container = document.getElementById('historyTimeline');
       container.innerHTML = '';
 
@@ -973,7 +954,7 @@
       document.getElementById('qrDevName').innerText = dev.name;
       document.getElementById('qrDevSN').innerText = dev.sn;
       document.getElementById('qrDevBrand').innerText = dev.brand;
-      document.getElementById('qrLabName').innerText = dev.lab === 'CORRIDOR' ? 'الممر الرئيسي (Main Corridor)' : `معمل ${dev.lab}`;
+      document.getElementById('qrLabName').innerText = `معمل ${dev.lab}`;
 
       const container = document.getElementById('qrContainer');
       container.innerHTML = '';
@@ -1067,21 +1048,12 @@
         let importedCount = 0;
         const batch = db.batch();
 
-        const existingSNs = new Set(devices.map(d => (d.sn || '').trim().toLowerCase()));
-        let skippedDuplicates = 0;
-
         for (let i = 1; i < lines.length; i++) {
           const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
           if (cols.length >= 4 && cols[0]) {
             const name = cols[0];
             const brand = cols[1] || 'غير محدد';
             const sn = cols[2] || `SN-IMP-${Date.now()}-${i}`;
-
-            if (existingSNs.has(sn.toLowerCase())) {
-              skippedDuplicates++;
-              continue; // تخطي الرقم التسلسلي المكرر
-            }
-            existingSNs.add(sn.toLowerCase());
             const lab = cols[3] || 'PCR';
             const lastDate = cols[4] || new Date().toISOString().split('T')[0];
             const rawIntervalVal = cols[5] ? cols[5].trim() : '6';
@@ -1102,11 +1074,7 @@
 
         try {
           await batch.commit();
-          let msg = `تم استيراد ${importedCount} جهاز بنجاح وحفظها سحابياً!`;
-          if (skippedDuplicates > 0) {
-            msg += `\n(تم تخطي ${skippedDuplicates} جهاز لأن الرقم التسلسلي S/N مسجل مسبقاً)`;
-          }
-          alert(msg);
+          alert(`تم استيراد ${importedCount} جهاز بنجاح وحفظها سحابياً!`);
         } catch (err) {
           alert('خطأ أثناء الاستيراد السحابي: ' + err.message);
         }
