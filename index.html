@@ -14,6 +14,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
   <!-- QRCode.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- HTML5 QR Code Scanner -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 
   <!-- Firebase App & Firestore SDKs (Compat version for browser script) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -48,14 +50,17 @@
       background-color: rgba(15, 23, 42, 0.65);
       backdrop-filter: blur(4px);
     }
+    
+    /* Print Styles */
     @media print {
       body * {
-        visibility: hidden;
+        visibility: hidden !important;
       }
-      #printModalContent, #printModalContent * {
-        visibility: visible;
+      /* If printing single QR asset tag */
+      body.printing-qr #printModalContent, body.printing-qr #printModalContent * {
+        visibility: visible !important;
       }
-      #printModalContent {
+      body.printing-qr #printModalContent {
         position: absolute;
         left: 0;
         top: 0;
@@ -65,16 +70,34 @@
         box-shadow: none !important;
         border: 2px solid #000 !important;
       }
+
+      /* If printing Official A4 Report */
+      body.printing-report #officialReportContainer, body.printing-report #officialReportContainer * {
+        visibility: visible !important;
+      }
+      body.printing-report #officialReportContainer {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        background: white !important;
+      }
       .no-print {
         display: none !important;
+      }
+      @page {
+        size: A4 portrait;
+        margin: 12mm;
       }
     }
   </style>
 </head>
-<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+<body class="text-slate-800 antialiased min-h-screen flex flex-col pb-16">
 
   <!-- Header -->
-  <header class="bg-white border-b-2 border-vacsera-red sticky top-0 z-30 shadow-sm">
+  <header class="bg-white border-b-2 border-vacsera-red sticky top-0 z-30 shadow-sm no-print">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
       
       <!-- Brand & Logos -->
@@ -112,7 +135,19 @@
       </div>
 
       <!-- Actions -->
-      <div class="flex items-center gap-2">
+      <div class="flex items-center flex-wrap gap-2">
+        <!-- Scan QR by Camera (Feature 2) -->
+        <button onclick="openScannerModal()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs sm:text-sm font-bold py-2 px-3 rounded-xl flex items-center gap-2 border border-indigo-200 shadow-xs transition" title="مسح باركود الجهاز بكاميرا الموبايل أو اللابتوب">
+          <i class="fa-solid fa-expand text-indigo-600"></i>
+          <span>مسح QR بالكاميرا</span>
+        </button>
+
+        <!-- Official Print Report A4 (Feature 6) -->
+        <button onclick="openOfficialReportModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold py-2 px-3 rounded-xl flex items-center gap-2 transition" title="طباعة تقرير معتمد رسمي">
+          <i class="fa-solid fa-print text-slate-700"></i>
+          <span>تقرير معتمد (A4)</span>
+        </button>
+
         <label class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold py-2 px-3 rounded-xl flex items-center gap-2 cursor-pointer transition">
           <i class="fa-solid fa-file-excel text-emerald-600"></i>
           <span>استيراد CSV / Excel</span>
@@ -121,7 +156,7 @@
         
         <button onclick="exportData()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold py-2 px-3 rounded-xl flex items-center gap-2 transition">
           <i class="fa-solid fa-file-arrow-down text-blue-600"></i>
-          <span>تصدير تقرير</span>
+          <span>تصدير إكسيل</span>
         </button>
 
         <button onclick="openDeviceModal()" class="bg-vacsera-red hover:bg-vacsera-redDark text-white text-xs sm:text-sm font-bold py-2 px-4 rounded-xl flex items-center gap-2 shadow-sm transition">
@@ -134,10 +169,10 @@
   </header>
 
   <!-- Main Content -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6 no-print">
 
     <!-- KPI / Statistics Cards -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
       
       <div id="card_ALL" onclick="filterByCard('ALL')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-vacsera-red transition">
         <div class="flex items-center justify-between mb-1">
@@ -185,6 +220,14 @@
           <i class="fa-solid fa-ban text-slate-400 text-sm"></i>
         </div>
         <div class="text-2xl font-black text-slate-700" id="statOut">0</div>
+      </div>
+
+      <div id="card_DUPLICATES" onclick="filterByCard('DUPLICATES')" class="bg-rose-50 p-3.5 rounded-2xl border border-rose-200 shadow-xs cursor-pointer hover:border-rose-500 transition">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs text-rose-700 font-bold">سيريال مكرر</span>
+          <i class="fa-solid fa-clone text-rose-500 text-sm"></i>
+        </div>
+        <div class="text-2xl font-black text-rose-600" id="statDuplicates">0</div>
       </div>
 
     </div>
@@ -237,12 +280,17 @@
         <table class="w-full text-right text-xs sm:text-sm">
           <thead class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 select-none">
             <tr>
+              <!-- Bulk Action Checkbox Header (Feature 5) -->
+              <th class="py-3.5 px-3 text-center w-10">
+                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" class="rounded text-vacsera-red focus:ring-0 cursor-pointer">
+              </th>
               <th class="py-3.5 px-4">اسم الجهاز</th>
               <th class="py-3.5 px-4">الشركة المصنعة</th>
               <th class="py-3.5 px-4">الرقم التسلسلي (S/N)</th>
               <th class="py-3.5 px-4">المعمل</th>
               <th class="py-3.5 px-4">آخر فحص</th>
               <th class="py-3.5 px-4">الفحص القادم</th>
+              <th class="py-3.5 px-4 text-center">المرفقات</th>
               <th class="py-3.5 px-4 text-center">الحالة</th>
               <th class="py-3.5 px-4 text-center">الإجراءات</th>
             </tr>
@@ -264,14 +312,67 @@
 
   </main>
 
+  <!-- Floating Bulk Actions Toolbar (Feature 5) -->
+  <div id="bulkActionsToolbar" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 hidden bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-4 border border-slate-700 animate-bounce-short">
+    <div class="flex items-center gap-2 text-xs font-bold">
+      <span class="w-2.5 h-2.5 rounded-full bg-vacsera-red"></span>
+      <span>تم تحديد <span id="bulkSelectedCount" class="text-amber-400 font-black">0</span> أجهزة</span>
+    </div>
+
+    <div class="h-4 w-px bg-slate-700"></div>
+
+    <!-- Bulk Change Lab -->
+    <div class="relative group">
+      <button class="text-xs font-bold bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition">
+        <i class="fa-solid fa-location-dot text-indigo-400"></i>
+        <span>نقل لمكان</span>
+        <i class="fa-solid fa-chevron-down text-[10px]"></i>
+      </button>
+      <div class="absolute bottom-full mb-1 right-0 hidden group-hover:block bg-white text-slate-800 rounded-xl shadow-xl border border-slate-200 py-1 w-44 text-xs font-bold z-50">
+        <div onclick="bulkSetLab('AFP')" class="px-3 py-1.5 hover:bg-slate-100 cursor-pointer">معمل 1 (AFP)</div>
+        <div onclick="bulkSetLab('ENV')" class="px-3 py-1.5 hover:bg-slate-100 cursor-pointer">معمل 2 (ENV)</div>
+        <div onclick="bulkSetLab('PCR')" class="px-3 py-1.5 hover:bg-slate-100 cursor-pointer">معمل 3 (PCR)</div>
+        <div onclick="bulkSetLab('C.C')" class="px-3 py-1.5 hover:bg-slate-100 cursor-pointer">معمل 4 (C.C)</div>
+        <div onclick="bulkSetLab('SEQ')" class="px-3 py-1.5 hover:bg-slate-100 cursor-pointer">معمل 5 (SEQ)</div>
+        <div onclick="bulkSetLab('CORRIDOR')" class="px-3 py-1.5 hover:bg-slate-100 cursor-pointer">الممر الرئيسي (Corridor)</div>
+      </div>
+    </div>
+
+    <!-- Bulk Change Status -->
+    <div class="relative group">
+      <button class="text-xs font-bold bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition">
+        <i class="fa-solid fa-sliders text-emerald-400"></i>
+        <span>تغيير الحالة</span>
+        <i class="fa-solid fa-chevron-down text-[10px]"></i>
+      </button>
+      <div class="absolute bottom-full mb-1 right-0 hidden group-hover:block bg-white text-slate-800 rounded-xl shadow-xl border border-slate-200 py-1 w-36 text-xs font-bold z-50">
+        <div onclick="bulkSetStatus('سليم')" class="px-3 py-1.5 hover:bg-slate-100 cursor-pointer text-emerald-600">يعمل بكفاءة</div>
+        <div onclick="bulkSetStatus('صيانة')" class="px-3 py-1.5 hover:bg-slate-100 cursor-pointer text-amber-600">تحت الصيانة</div>
+        <div onclick="bulkSetStatus('خارج الخدمة')" class="px-3 py-1.5 hover:bg-slate-100 cursor-pointer text-slate-600">خارج الخدمة</div>
+      </div>
+    </div>
+
+    <!-- Bulk Delete -->
+    <button onclick="bulkDelete()" class="text-xs font-bold bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition">
+      <i class="fa-solid fa-trash-can"></i>
+      <span>حذف جماعي</span>
+    </button>
+
+    <div class="h-4 w-px bg-slate-700"></div>
+
+    <button onclick="clearBulkSelection()" class="text-slate-400 hover:text-white text-xs" title="إلغاء التحديد">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </div>
+
   <!-- Footer -->
-  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 no-print">
     <p>الشركة المصرية لإنتاج الأمصال واللقاحات والأدوية (VACSERA) - قطاع الشؤون الفنية والرقابة المعملية &copy; 2026</p>
   </footer>
 
   <!-- ================= MODALS ================= -->
 
-  <!-- Device Form Modal (Add / Edit) -->
+  <!-- Device Form Modal (Add / Edit) with Attachment (Feature 4) -->
   <div id="deviceModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
     <div class="fixed inset-0 modal-backdrop" onclick="closeDeviceModal()"></div>
     <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto z-10">
@@ -284,6 +385,7 @@
 
       <form id="deviceForm" onsubmit="saveDevice(event)" class="space-y-4">
         <input type="hidden" id="editDeviceId">
+        <input type="hidden" id="devExistingAttachment">
 
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">اسم الجهاز والطراز <span class="text-red-500">*</span></label>
@@ -364,6 +466,19 @@
           </div>
         </div>
 
+        <!-- Attachment Upload (Feature 4) -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+          <div class="text-xs font-bold text-slate-800 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <i class="fa-solid fa-paperclip text-blue-600"></i>
+              <span>مرفق شهادة المعايرة أو الكتالوج (PDF / صورة)</span>
+            </span>
+            <span id="devAttachmentPreviewBadge" class="hidden text-[10px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full font-bold">تم إرفاق ملف</span>
+          </div>
+          <input type="file" id="devAttachmentInput" accept="image/*,.pdf" class="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+          <p class="text-[10px] text-slate-400">يمكنك رفع صورة شهادة المعايرة أو ملف PDF لحفظه وأرشفته مع بيانات الجهاز.</p>
+        </div>
+
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">ملاحظات الفحص والتشغيل</label>
           <textarea id="devNotes" rows="2" placeholder="ملاحظات المعايرة، فلاتر الهواء، صلاحية الكواشف..." class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red resize-none"></textarea>
@@ -377,7 +492,33 @@
     </div>
   </div>
 
-  <!-- Quick Inspection Modal -->
+  <!-- Camera QR Scanner Modal (Feature 2) -->
+  <div id="scannerModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeScannerModal()"></div>
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative z-10 flex flex-col items-center">
+      <div class="flex items-center justify-between w-full border-b pb-3 mb-4">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-camera text-indigo-600"></i>
+          <h3 class="text-base font-black text-slate-800">مسح باركود الجهاز بالكاميرا</h3>
+        </div>
+        <button onclick="closeScannerModal()" class="text-slate-400 hover:text-slate-600 text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div id="qrReaderContainer" class="w-full bg-black rounded-xl overflow-hidden min-h-[260px] flex items-center justify-center text-white text-xs">
+        <div id="qr-reader" class="w-full"></div>
+      </div>
+
+      <p class="text-xs text-slate-500 mt-3 text-center">وجّه كاميرا الهاتف أو اللابتوب نحو كود الـ QR الملصق على الجهاز لفتح بياناته وسجله مباشرة.</p>
+
+      <div class="w-full flex justify-end pt-3 border-t mt-4">
+        <button onclick="closeScannerModal()" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Inspection Modal with Attachment (Feature 4) -->
   <div id="inspectModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
     <div class="fixed inset-0 modal-backdrop" onclick="closeInspectModal()"></div>
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative z-10">
@@ -424,6 +565,11 @@
         </div>
 
         <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">إرفاق تقرير الفحص أو شهادة المعايرة</label>
+          <input type="file" id="inspAttachmentInput" accept="image/*,.pdf" class="w-full text-xs text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer">
+        </div>
+
+        <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">تقرير الفحص والملاحظات</label>
           <textarea id="inspNotes" rows="2" placeholder="تم استبدال الفلتر، الجهاز يعمل ضمن المعايير..." class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red resize-none"></textarea>
         </div>
@@ -436,7 +582,7 @@
     </div>
   </div>
 
-  <!-- History Log Modal -->
+  <!-- History Log Modal (Shows Attachments View/Download) -->
   <div id="historyModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
     <div class="fixed inset-0 modal-backdrop" onclick="closeHistoryModal()"></div>
     <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl relative max-h-[85vh] flex flex-col z-10">
@@ -450,17 +596,24 @@
         </button>
       </div>
 
+      <!-- Quick device info box -->
+      <div id="historyDeviceSpecsBox" class="bg-slate-50 p-3 rounded-xl border border-slate-200 mb-3 text-xs space-y-1"></div>
+
       <div class="overflow-y-auto flex-1 pr-1 space-y-3" id="historyTimeline">
         <!-- History items rendered here -->
       </div>
 
-      <div class="pt-3 border-t mt-4 text-left">
+      <div class="pt-3 border-t mt-4 flex items-center justify-between">
+        <button onclick="openQRModalFromHistory()" class="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 flex items-center gap-1.5">
+          <i class="fa-solid fa-qrcode"></i>
+          <span>عرض باركود الجهاز</span>
+        </button>
         <button onclick="closeHistoryModal()" class="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200">إغلاق</button>
       </div>
     </div>
   </div>
 
-  <!-- QR Asset Tag Modal (Ready to Print) -->
+  <!-- QR Asset Tag Modal (Direct Smart Link - Feature 2) -->
   <div id="qrModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
     <div class="fixed inset-0 modal-backdrop" onclick="closeQRModal()"></div>
     <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl relative z-10">
@@ -487,12 +640,13 @@
           <div class="text-xs font-black text-slate-900" id="qrDevName">Real-Time PCR System</div>
           <div class="text-[11px] font-mono font-bold text-slate-700">S/N: <span id="qrDevSN">SN-PCR-8821</span></div>
           <div class="text-[10px] text-slate-500">الشركة: <span id="qrDevBrand">Bio-Rad Laboratories</span></div>
+          <div class="text-[9px] text-slate-400 pt-1 text-center font-mono">امسح الكود لفتح ملف الجهاز الإلكتروني مباشرة</div>
         </div>
       </div>
 
       <div class="flex items-center justify-end gap-2 mt-4 pt-3 border-t no-print">
         <button onclick="closeQRModal()" class="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">إغلاق</button>
-        <button onclick="window.print()" class="px-4 py-2 text-xs font-bold text-white bg-vacsera-black hover:bg-black rounded-xl flex items-center gap-1 shadow-sm">
+        <button onclick="printAssetTag()" class="px-4 py-2 text-xs font-bold text-white bg-vacsera-black hover:bg-black rounded-xl flex items-center gap-1 shadow-sm">
           <i class="fa-solid fa-print"></i>
           <span>طباعة البطاقة</span>
         </button>
@@ -500,9 +654,119 @@
     </div>
   </div>
 
+  <!-- Official Print-Friendly A4 Report Modal (Feature 6) -->
+  <div id="reportModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeOfficialReportModal()"></div>
+    <div class="bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl relative max-h-[92vh] flex flex-col z-10">
+      <div class="flex items-center justify-between border-b pb-3 mb-4 no-print">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-file-invoice text-vacsera-red"></i>
+          <h3 class="text-base sm:text-lg font-black text-slate-800">معاينة التقرير الرسمي المعتمد (جاهز للطباعة A4)</h3>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="printOfficialReport()" class="px-4 py-2 text-xs font-bold text-white bg-vacsera-red hover:bg-vacsera-redDark rounded-xl flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-print"></i>
+            <span>طباعة التقرير الآن</span>
+          </button>
+          <button onclick="closeOfficialReportModal()" class="text-slate-400 hover:text-slate-600 text-lg">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Scrollable container for preview -->
+      <div class="overflow-y-auto flex-1 p-2 bg-slate-50 border rounded-xl" id="reportScrollContainer">
+        <!-- Exact printable document layout -->
+        <div id="officialReportContainer" class="bg-white p-8 max-w-[210mm] mx-auto text-slate-900 text-xs shadow-sm border border-slate-200">
+          
+          <!-- Official Header -->
+          <div class="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-4">
+            <div class="text-right">
+              <div class="text-sm font-black text-slate-900">جمهورية مصر العربية</div>
+              <div class="text-xs font-bold text-slate-700">وزارة الصحة والسكان</div>
+              <div class="text-xs font-bold text-vacsera-red">الشركة المصرية لإنتاج الأمصال واللقاحات والأدوية (VACSERA)</div>
+              <div class="text-[11px] text-slate-600 font-medium">قطاع الشؤون الفنية والرقابة المعملية - وحدة Polio</div>
+            </div>
+            
+            <div class="text-center">
+              <div class="font-black text-base text-slate-900 border-2 border-slate-900 px-3 py-1 rounded">
+                تقرير حصر ومعايرة الأجهزة المعملية
+              </div>
+              <div class="text-[10px] text-slate-500 mt-1 font-mono" id="reportGeneratedDate"></div>
+            </div>
+
+            <div class="w-32 h-12 flex items-center justify-center">
+              <svg viewBox="0 0 280 80" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="0,78 280,78 280,26 80,62 0,78" fill="#111827" />
+                <text x="5" y="66" font-family="'Cairo', sans-serif" font-weight="900" font-style="italic" font-size="74" fill="#D32828">VACSERA</text>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Summary Matrix -->
+          <div class="grid grid-cols-4 gap-2 mb-4 text-center">
+            <div class="border border-slate-300 p-2 rounded">
+              <span class="block text-[10px] text-slate-500">إجمالي الأجهزة بالتقرير</span>
+              <span class="text-sm font-black text-slate-900" id="repStatTotal">0</span>
+            </div>
+            <div class="border border-slate-300 p-2 rounded bg-emerald-50">
+              <span class="block text-[10px] text-emerald-800">تعمل بكفاءة</span>
+              <span class="text-sm font-black text-emerald-700" id="repStatOperational">0</span>
+            </div>
+            <div class="border border-slate-300 p-2 rounded bg-amber-50">
+              <span class="block text-[10px] text-amber-800">تحت الصيانة</span>
+              <span class="text-sm font-black text-amber-700" id="repStatMaintenance">0</span>
+            </div>
+            <div class="border border-slate-300 p-2 rounded bg-slate-100">
+              <span class="block text-[10px] text-slate-600">خارج الخدمة</span>
+              <span class="text-sm font-black text-slate-700" id="repStatOut">0</span>
+            </div>
+          </div>
+
+          <!-- Main Inventory Table -->
+          <table class="w-full text-right border-collapse border border-slate-300 text-[10px] mb-8">
+            <thead>
+              <tr class="bg-slate-100 text-slate-800 border-b border-slate-300">
+                <th class="border border-slate-300 p-1.5 text-center w-8">م</th>
+                <th class="border border-slate-300 p-1.5">اسم الجهاز والطراز</th>
+                <th class="border border-slate-300 p-1.5">الشركة المصنعة</th>
+                <th class="border border-slate-300 p-1.5 font-mono">الرقم التسلسلي S/N</th>
+                <th class="border border-slate-300 p-1.5">المعمل / المكان</th>
+                <th class="border border-slate-300 p-1.5">مواصفات المعايرة / السماح</th>
+                <th class="border border-slate-300 p-1.5">آخر فحص</th>
+                <th class="border border-slate-300 p-1.5">الفحص القادم</th>
+                <th class="border border-slate-300 p-1.5 text-center">الحالة</th>
+              </tr>
+            </thead>
+            <tbody id="reportTableBody">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+
+          <!-- Official Signatures Footer -->
+          <div class="grid grid-cols-3 gap-6 pt-6 border-t-2 border-slate-900 text-center text-xs font-bold">
+            <div>
+              <p class="mb-8">مهندس الأجهزة الطبية والصيانة</p>
+              <p class="text-slate-400 font-normal">..........................................</p>
+            </div>
+            <div>
+              <p class="mb-8">مسؤول توكيد وضبط الجودة (QA)</p>
+              <p class="text-slate-400 font-normal">..........................................</p>
+            </div>
+            <div>
+              <p class="mb-8">اعتماد مدير عام المعامل والرقابة</p>
+              <p class="text-slate-400 font-normal">..........................................</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Application Logic & Firebase Integration -->
   <script>
-    // Firebase Configuration from your Project
+    // Firebase Configuration
     const firebaseConfig = {
       apiKey: "AIzaSyAkQWZF1tV-ss8jVmSFq31yz_FSBHCyGdg",
       authDomain: "vacsera-polio.firebaseapp.com",
@@ -512,69 +776,134 @@
       appId: "1:133187376012:web:93632e11927ad8ee07bca9"
     };
 
-    // Initialize Firebase & Firestore
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const COLLECTION_NAME = "polio_devices";
 
-    const initialDevices = [
-      {
-        name: 'Real-Time PCR System CFX96',
-        brand: 'Bio-Rad Laboratories',
-        sn: 'CFX96-VAC-0041',
-        lab: 'PCR',
-        intervalMonths: 3,
-        lastDate: '2026-09-15',
-        status: 'سليم',
-        notes: 'تمت المعايرة الضوئية الشاملة واستبدال اللمبة بنجاح.',
-        history: [
-          { date: '2026-09-15', inspector: 'م. أحمد حمدي', type: 'معايرة دقيقة (Calibration)', notes: 'معايرة ضوئية وفحص كفاءة القنوات' },
-          { date: '2026-06-10', inspector: 'م. شريف عادل', type: 'صيانة دورية وقائية', notes: 'تنظيف كتل التسخين والتهوية' }
-        ]
-      },
-      {
-        name: 'كابينة أمان حيوي Class II Biosafety Cabinet',
-        brand: 'Thermo Fisher Scientific',
-        sn: 'BSC-1300-ENV-12',
-        lab: 'ENV',
-        intervalMonths: 6,
-        lastDate: '2026-04-10',
-        status: 'سليم',
-        notes: 'فحص سرعة سريان الهواء وتغيير فلتر HEPA.',
-        history: [
-          { date: '2026-04-10', inspector: 'م. محمد فتحي', type: 'صيانة دورية وقائية', notes: 'اختبار كفاءة فلتر الـ HEPA وتدفق الهواء' }
-        ]
-      },
-      {
-        name: 'CO2 Incubator لحضانة الخلايا',
-        brand: 'Eppendorf',
-        sn: 'INC-CO2-CC-88',
-        lab: 'C.C',
-        intervalMonths: 3,
-        lastDate: '2026-10-05',
-        status: 'سليم',
-        notes: 'ضبط حساس الـ CO2 وحرارة 37 درجة مئوية.',
-        history: [
-          { date: '2026-10-05', inspector: 'م. خالد كمال', type: 'معايرة دقيقة (Calibration)', notes: 'معايرة حساس غاز CO2 ومستوى الرطوبة' }
-        ]
-      },
-      {
-        name: 'جهاز طرد مركزي مبرد Refrigerated Centrifuge',
-        brand: 'Beckman Coulter',
-        sn: 'BC-CENT-AFP-03',
-        lab: 'AFP',
-        intervalMonths: 6,
-        lastDate: '2026-03-01',
-        status: 'صيانة',
-        notes: 'صوت غير طبيعي في الموتور وتذبذب في التبريد.',
-        history: [
-          { date: '2026-03-01', inspector: 'م. كريم محمود', type: 'فحص جودة روتيني', notes: 'تم رصد اهتزاز، في انتظار قطع الغيار' }
-        ]
-      }
-    ];
-
     let devices = [];
     let currentFilterCard = 'ALL';
+    let selectedDeviceIds = new Set();
+    let html5QrScanner = null;
+    let activeHistoryDeviceId = null;
+
+    // Feature 5: Bulk Selection Logic
+    function toggleSelectAll(masterCheckbox) {
+      const visibleCheckboxes = document.querySelectorAll('.device-check');
+      visibleCheckboxes.forEach(cb => {
+        cb.checked = masterCheckbox.checked;
+        if (masterCheckbox.checked) {
+          selectedDeviceIds.add(cb.value);
+        } else {
+          selectedDeviceIds.delete(cb.value);
+        }
+      });
+      updateBulkToolbarUI();
+    }
+
+    function toggleDeviceSelect(cb, id) {
+      if (cb.checked) {
+        selectedDeviceIds.add(id);
+      } else {
+        selectedDeviceIds.delete(id);
+        const master = document.getElementById('selectAllCheckbox');
+        if (master) master.checked = false;
+      }
+      updateBulkToolbarUI();
+    }
+
+    function updateBulkToolbarUI() {
+      const toolbar = document.getElementById('bulkActionsToolbar');
+      const countEl = document.getElementById('bulkSelectedCount');
+      const count = selectedDeviceIds.size;
+      countEl.innerText = count;
+
+      if (count > 0) {
+        toolbar.classList.remove('hidden');
+      } else {
+        toolbar.classList.add('hidden');
+        const master = document.getElementById('selectAllCheckbox');
+        if (master) master.checked = false;
+      }
+    }
+
+    function clearBulkSelection() {
+      selectedDeviceIds.clear();
+      document.querySelectorAll('.device-check').forEach(cb => cb.checked = false);
+      const master = document.getElementById('selectAllCheckbox');
+      if (master) master.checked = false;
+      updateBulkToolbarUI();
+    }
+
+    async function bulkSetLab(newLab) {
+      if (selectedDeviceIds.size === 0) return;
+      const count = selectedDeviceIds.size;
+      if (!confirm(`هل أنت متأكد من نقل ${count} أجهزة المحددة إلى المكان الجديد؟`)) return;
+
+      const batch = db.batch();
+      selectedDeviceIds.forEach(id => {
+        const ref = db.collection(COLLECTION_NAME).doc(id);
+        batch.update(ref, { lab: newLab });
+      });
+
+      try {
+        await batch.commit();
+        alert(`تم نقل ${count} أجهزة بنجاح!`);
+        clearBulkSelection();
+      } catch (err) {
+        alert('خطأ أثناء النقل الجماعي: ' + err.message);
+      }
+    }
+
+    async function bulkSetStatus(newStatus) {
+      if (selectedDeviceIds.size === 0) return;
+      const count = selectedDeviceIds.size;
+      if (!confirm(`هل أنت متأكد من تغيير حالة ${count} أجهزة إلى "${newStatus}"؟`)) return;
+
+      const batch = db.batch();
+      selectedDeviceIds.forEach(id => {
+        const ref = db.collection(COLLECTION_NAME).doc(id);
+        batch.update(ref, { status: newStatus });
+      });
+
+      try {
+        await batch.commit();
+        alert(`تم تحديث حالة ${count} أجهزة بنجاح!`);
+        clearBulkSelection();
+      } catch (err) {
+        alert('خطأ أثناء التحديث الجماعي: ' + err.message);
+      }
+    }
+
+    async function bulkDelete() {
+      if (selectedDeviceIds.size === 0) return;
+      const count = selectedDeviceIds.size;
+      if (!confirm(`تحذير نهائي: هل أنت متأكد تماماً من حذف ${count} أجهزة المحددة من المنظومة؟ هذا الإجراء لا يمكن التراجع عنه!`)) return;
+
+      const batch = db.batch();
+      selectedDeviceIds.forEach(id => {
+        const ref = db.collection(COLLECTION_NAME).doc(id);
+        batch.delete(ref);
+      });
+
+      try {
+        await batch.commit();
+        alert(`تم حذف ${count} أجهزة بنجاح.`);
+        clearBulkSelection();
+      } catch (err) {
+        alert('خطأ أثناء الحذف الجماعي: ' + err.message);
+      }
+    }
+
+    // Helper: Parse Base64 file from input
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve({ name: file.name, size: file.size, type: file.type, data: reader.result });
+        reader.onerror = error => reject(error);
+      });
+    }
+
     function onFilterChange() {
       currentFilterCard = 'ALL';
       updateCardStyles();
@@ -582,7 +911,7 @@
     }
 
     function updateCardStyles() {
-      const cards = ['ALL', 'OPERATIONAL', 'MAINTENANCE', 'OVERDUE', 'UPCOMING', 'OUT'];
+      const cards = ['ALL', 'OPERATIONAL', 'MAINTENANCE', 'OVERDUE', 'UPCOMING', 'OUT', 'DUPLICATES'];
       cards.forEach(c => {
         const el = document.getElementById('card_' + c);
         if (el) {
@@ -605,21 +934,17 @@
       renderTable();
     }
 
-
-        function parseSafeDate(dateStr) {
+    function parseSafeDate(dateStr) {
       if (!dateStr || typeof dateStr !== 'string') return null;
       dateStr = dateStr.trim();
       if (!dateStr) return null;
 
-      // Handle DD/MM/YYYY or DD-MM-YYYY format
       const parts = dateStr.split(/[-/]/);
       if (parts.length === 3) {
         if (parts[0].length === 4) {
-          // YYYY-MM-DD
           const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
           return isNaN(d.getTime()) ? null : d;
         } else if (parts[2].length === 4) {
-          // DD/MM/YYYY
           const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
           return isNaN(d.getTime()) ? null : d;
         }
@@ -670,22 +995,26 @@
       }
     }
 
+    function normalizeStatus(st) {
+      if (!st || typeof st !== 'string') return 'سليم';
+      const s = st.trim();
+      if (s.includes('خارج') || s.includes('معطل') || s.toLowerCase().includes('out')) return 'خارج الخدمة';
+      if (s.includes('صيان') || s.toLowerCase().includes('maint')) return 'صيانة';
+      if (s.includes('كفاء') || s.includes('سليم') || s.includes('يعمل') || s.toLowerCase().includes('good')) return 'سليم';
+      return s;
+    }
+
     // Real-time Cloud Firestore Listener
     function initCloudSync() {
       const badge = document.getElementById('cloudStatusBadge');
 
       db.collection(COLLECTION_NAME).onSnapshot((snapshot) => {
-        if (snapshot.empty) {
-          // If Firestore is empty initially, seed it with sample initial data
-          initialDevices.forEach(dev => {
-            db.collection(COLLECTION_NAME).add(dev);
-          });
-          return;
-        }
-
         devices = [];
         snapshot.forEach((doc) => {
-          devices.push({ id: doc.id, ...doc.data() });
+          const data = doc.data();
+          if (data && (data.name || data.sn)) {
+            devices.push({ id: doc.id, ...data });
+          }
         });
 
         if (badge) {
@@ -695,6 +1024,9 @@
 
         updateStats();
         renderTable();
+
+        // Check if page opened with ?dev=... parameter (from QR code scan)
+        checkUrlForDirectDevice();
       }, (error) => {
         console.error("Firestore sync error:", error);
         if (badge) {
@@ -709,11 +1041,25 @@
       }
     }
 
+    // Feature 2: Smart QR Navigation on Page Load
+    function checkUrlForDirectDevice() {
+      const params = new URLSearchParams(window.location.search);
+      const targetDevId = params.get('dev');
+      if (targetDevId && devices.length > 0) {
+        const found = devices.find(d => d.id === targetDevId || d.sn === targetDevId);
+        if (found) {
+          // Clear query param so it doesn't open repeatedly on reload
+          window.history.replaceState({}, document.title, window.location.pathname);
+          openHistoryModal(found.id);
+        }
+      }
+    }
+
     function updateStats() {
       document.getElementById('statTotal').innerText = devices.length;
-      document.getElementById('statOperational').innerText = devices.filter(d => d.status === 'سليم').length;
-      document.getElementById('statMaintenance').innerText = devices.filter(d => d.status === 'صيانة').length;
-      document.getElementById('statOut').innerText = devices.filter(d => d.status === 'خارج الخدمة').length;
+      document.getElementById('statOperational').innerText = devices.filter(d => normalizeStatus(d.status) === 'سليم').length;
+      document.getElementById('statMaintenance').innerText = devices.filter(d => normalizeStatus(d.status) === 'صيانة').length;
+      document.getElementById('statOut').innerText = devices.filter(d => normalizeStatus(d.status) === 'خارج الخدمة').length;
 
       let overdueCount = 0;
       let upcomingCount = 0;
@@ -724,6 +1070,18 @@
       });
       document.getElementById('statOverdue').innerText = overdueCount;
       document.getElementById('statUpcoming').innerText = upcomingCount;
+
+      const snFrequency = {};
+      devices.forEach(d => {
+        const s = (d.sn || '').trim().toLowerCase();
+        if (s) snFrequency[s] = (snFrequency[s] || 0) + 1;
+      });
+      const dupCount = devices.filter(d => {
+        const s = (d.sn || '').trim().toLowerCase();
+        return s && snFrequency[s] > 1;
+      }).length;
+      const dupBadgeEl = document.getElementById('statDuplicates');
+      if (dupBadgeEl) dupBadgeEl.innerText = dupCount;
     }
 
     function renderTable() {
@@ -735,6 +1093,12 @@
 
       tbody.innerHTML = '';
 
+      const snCounts = {};
+      devices.forEach(d => {
+        const s = (d.sn || '').trim().toLowerCase();
+        if (s) snCounts[s] = (snCounts[s] || 0) + 1;
+      });
+
       const filtered = devices.filter(device => {
         const matchesSearch = !search || 
           (device.name && device.name.toLowerCase().includes(search)) || 
@@ -742,7 +1106,8 @@
           (device.sn && device.sn.toLowerCase().includes(search));
 
         const matchesLab = lab === 'ALL' || device.lab === lab;
-        const matchesStatus = statusFilter === 'ALL' || device.status === statusFilter;
+        const devNormStatus = normalizeStatus(device.status);
+        const matchesStatus = statusFilter === 'ALL' || devNormStatus === statusFilter;
         
         const dueInfo = getDueStatus(device);
         let matchesOverdue = true;
@@ -750,12 +1115,16 @@
           matchesOverdue = dueInfo.isOverdue;
         }
 
+        const deviceSN = (device.sn || '').trim().toLowerCase();
+        const isDuplicateSN = Boolean(deviceSN && snCounts[deviceSN] > 1);
+
         let matchesCard = true;
-        if (currentFilterCard === 'OPERATIONAL') matchesCard = (device.status === 'سليم');
-        else if (currentFilterCard === 'MAINTENANCE') matchesCard = (device.status === 'صيانة');
-        else if (currentFilterCard === 'OUT') matchesCard = (device.status === 'خارج الخدمة');
+        if (currentFilterCard === 'OPERATIONAL') matchesCard = (devNormStatus === 'سليم');
+        else if (currentFilterCard === 'MAINTENANCE') matchesCard = (devNormStatus === 'صيانة');
+        else if (currentFilterCard === 'OUT') matchesCard = (devNormStatus === 'خارج الخدمة');
         else if (currentFilterCard === 'OVERDUE') matchesCard = dueInfo.isOverdue;
         else if (currentFilterCard === 'UPCOMING') matchesCard = dueInfo.isUpcoming;
+        else if (currentFilterCard === 'DUPLICATES') matchesCard = isDuplicateSN;
 
         return matchesSearch && matchesLab && matchesStatus && matchesOverdue && matchesCard;
       });
@@ -782,9 +1151,10 @@
         else if (device.lab === 'CORRIDOR') labBadge = '<span class="bg-slate-100 text-slate-700 border border-slate-300 px-2.5 py-0.5 rounded-full text-xs font-bold">الممر الرئيسي (Corridor)</span>';
         else labBadge = `<span class="bg-slate-50 text-slate-700 border border-slate-200 px-2.5 py-0.5 rounded-full text-xs font-bold">${device.lab || 'عام'}</span>`;
 
+        const rowStatus = normalizeStatus(device.status);
         let statusBadge = '';
-        if (device.status === 'سليم') statusBadge = '<span class="inline-flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full font-bold text-xs"><i class="fa-solid fa-circle-check text-[10px]"></i> كفاءة</span>';
-        else if (device.status === 'صيانة') statusBadge = '<span class="inline-flex items-center gap-1 text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full font-bold text-xs"><i class="fa-solid fa-screwdriver-wrench text-[10px]"></i> صيانة</span>';
+        if (rowStatus === 'سليم') statusBadge = '<span class="inline-flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full font-bold text-xs"><i class="fa-solid fa-circle-check text-[10px]"></i> كفاءة</span>';
+        else if (rowStatus === 'صيانة') statusBadge = '<span class="inline-flex items-center gap-1 text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full font-bold text-xs"><i class="fa-solid fa-screwdriver-wrench text-[10px]"></i> صيانة</span>';
         else statusBadge = '<span class="inline-flex items-center gap-1 text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full font-bold text-xs"><i class="fa-solid fa-ban text-[10px]"></i> معطل</span>';
 
         const calibInfoHtml = (device.calibParams || device.rangeAccuracy || device.tolerance) ? `
@@ -794,14 +1164,34 @@
             ${device.tolerance ? `<span class="bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded border border-sky-200 font-mono">Tol: ${device.tolerance}</span>` : ''}
           </div>` : '';
 
+        // Feature 4: Attachment indicator
+        const hasAttachment = Boolean(device.attachment || (device.history && device.history.some(h => h.attachment)));
+        const attachmentHtml = hasAttachment ? `
+          <button onclick="viewDeviceAttachment('${device.id}')" title="عرض شهادة المعايرة / المرفق" class="text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1">
+            <i class="fa-solid fa-paperclip"></i>
+            <span>مرفق</span>
+          </button>` : `<span class="text-slate-300 text-xs">—</span>`;
+
+        const isChecked = selectedDeviceIds.has(device.id);
+
         tr.innerHTML = `
+          <td class="py-3.5 px-3 text-center">
+            <input type="checkbox" class="device-check rounded text-vacsera-red focus:ring-0 cursor-pointer" value="${device.id}" ${isChecked ? 'checked' : ''} onchange="toggleDeviceSelect(this, '${device.id}')">
+          </td>
           <td class="py-3.5 px-4 font-bold text-slate-900">
             <div>${device.name || ''}</div>
             <div class="text-[11px] text-slate-400 font-normal sm:hidden font-mono">${device.sn || ''}</div>
             ${calibInfoHtml}
           </td>
-          <td class="py-3.5 px-4 text-slate-600 font-semibold">${device.brand || ''}</td>
-          <td class="py-3.5 px-4 font-mono font-bold text-slate-700 text-xs">${device.sn || ''}</td>
+          <td class="py-3.5 px-4 text-slate-700 font-bold">
+            <span>${device.brand || '—'}</span>
+          </td>
+          <td class="py-3.5 px-4 font-mono font-bold text-slate-700 text-xs">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span>${device.sn || '—'}</span>
+              ${(device.sn && snCounts[device.sn.trim().toLowerCase()] > 1) ? '<span class="bg-rose-100 text-rose-700 border border-rose-300 text-[10px] px-1.5 py-0.5 rounded-md font-bold tracking-tight inline-flex items-center gap-1"><i class="fa-solid fa-triangle-exclamation text-[9px]"></i> مكرر</span>' : ''}
+            </div>
+          </td>
           <td class="py-3.5 px-4">${labBadge}</td>
           <td class="py-3.5 px-4 text-slate-600 text-xs">${device.lastDate || '—'}</td>
           <td class="py-3.5 px-4">
@@ -809,6 +1199,7 @@
               ${due.nextDateStr || ''} (${due.text})
             </span>
           </td>
+          <td class="py-3.5 px-4 text-center">${attachmentHtml}</td>
           <td class="py-3.5 px-4 text-center">${statusBadge}</td>
           <td class="py-3.5 px-4 text-center">
             <div class="flex items-center justify-center gap-1">
@@ -833,6 +1224,8 @@
 
         tbody.appendChild(tr);
       });
+
+      updateBulkToolbarUI();
     }
 
     function filterByCard(cardType) {
@@ -846,6 +1239,10 @@
       const modal = document.getElementById('deviceModal');
       const form = document.getElementById('deviceForm');
       form.reset();
+
+      const previewBadge = document.getElementById('devAttachmentPreviewBadge');
+      previewBadge.classList.add('hidden');
+      document.getElementById('devExistingAttachment').value = '';
 
       if (device) {
         document.getElementById('modalTitle').innerText = 'تعديل بيانات الجهاز';
@@ -861,6 +1258,12 @@
         document.getElementById('devRangeAccuracy').value = device.rangeAccuracy || '';
         document.getElementById('devTolerance').value = device.tolerance || '';
         document.getElementById('devNotes').value = device.notes || '';
+
+        if (device.attachment) {
+          document.getElementById('devExistingAttachment').value = JSON.stringify(device.attachment);
+          previewBadge.classList.remove('hidden');
+          previewBadge.innerText = `مرفق: ${device.attachment.name || 'ملف محفوظ'}`;
+        }
       } else {
         document.getElementById('modalTitle').innerText = 'إضافة جهاز طبي جديد';
         document.getElementById('editDeviceId').value = '';
@@ -890,9 +1293,9 @@
       const brand = document.getElementById('devBrand').value.trim();
       const sn = document.getElementById('devSN').value.trim();
 
-      // التحقق من عدم تكرار الرقم التسلسلي (S/N)
+      // Check S/N duplicate
       const isDuplicate = devices.some(d => {
-        if (id && d.id === id) return false; // نفس الجهاز في حالة التعديل
+        if (id && d.id === id) return false;
         return d.sn && d.sn.trim().toLowerCase() === sn.toLowerCase();
       });
 
@@ -901,6 +1304,7 @@
         document.getElementById('devSN').focus();
         return;
       }
+
       const lab = document.getElementById('devLab').value;
       const status = document.getElementById('devStatus').value;
       const lastDate = document.getElementById('devLastDate').value;
@@ -911,9 +1315,28 @@
       const tolerance = document.getElementById('devTolerance').value.trim();
       const notes = document.getElementById('devNotes').value.trim();
 
+      // Feature 4: Handle Attachment file
+      let attachment = null;
+      const fileInput = document.getElementById('devAttachmentInput');
+      if (fileInput.files && fileInput.files[0]) {
+        try {
+          attachment = await fileToBase64(fileInput.files[0]);
+        } catch (err) {
+          console.error("Error reading attachment:", err);
+        }
+      } else {
+        const existing = document.getElementById('devExistingAttachment').value;
+        if (existing) {
+          try { attachment = JSON.parse(existing); } catch (_) {}
+        }
+      }
+
       const deviceData = {
         name, brand, sn, lab, status, lastDate, intervalMonths, calibParams, rangeAccuracy, tolerance, notes
       };
+      if (attachment) {
+        deviceData.attachment = attachment;
+      }
 
       try {
         if (id) {
@@ -924,7 +1347,8 @@
               date: lastDate,
               inspector: 'تسجيل مبدئي',
               type: 'فحص استلام أولي',
-              notes: notes || 'تم تسجيل الجهاز بالمنظومة'
+              notes: notes || 'تم تسجيل الجهاز بالمنظومة',
+              attachment: attachment || null
             }
           ];
           await db.collection(COLLECTION_NAME).add(deviceData);
@@ -939,6 +1363,8 @@
       if (confirm('هل أنت متأكد من حذف هذا الجهاز وسجله من المنظومة؟')) {
         try {
           await db.collection(COLLECTION_NAME).doc(id).delete();
+          selectedDeviceIds.delete(id);
+          updateBulkToolbarUI();
         } catch (err) {
           alert('حدث خطأ أثناء الحذف: ' + err.message);
         }
@@ -955,6 +1381,7 @@
       document.getElementById('inspStatus').value = dev.status;
       document.getElementById('inspInspector').value = '';
       document.getElementById('inspNotes').value = '';
+      document.getElementById('inspAttachmentInput').value = '';
 
       document.getElementById('inspectModal').classList.remove('hidden');
     }
@@ -975,27 +1402,66 @@
       const dev = devices.find(d => d.id === id);
       if (!dev) return;
 
+      let inspAttachment = null;
+      const fileInput = document.getElementById('inspAttachmentInput');
+      if (fileInput.files && fileInput.files[0]) {
+        try {
+          inspAttachment = await fileToBase64(fileInput.files[0]);
+        } catch (err) {
+          console.error("Error reading inspection attachment:", err);
+        }
+      }
+
       const currentHistory = dev.history || [];
       const updatedHistory = [
         {
           date: inspDate,
           type: inspType,
           inspector: inspector,
-          notes: notes
+          notes: notes,
+          attachment: inspAttachment
         },
         ...currentHistory
       ];
 
+      const updateData = {
+        lastDate: inspDate,
+        status: status,
+        notes: notes || dev.notes || '',
+        history: updatedHistory
+      };
+      if (inspAttachment) {
+        updateData.attachment = inspAttachment;
+      }
+
       try {
-        await db.collection(COLLECTION_NAME).doc(id).update({
-          lastDate: inspDate,
-          status: status,
-          notes: notes || dev.notes || '',
-          history: updatedHistory
-        });
+        await db.collection(COLLECTION_NAME).doc(id).update(updateData);
         closeInspectModal();
       } catch (err) {
         alert('خطأ أثناء حفظ الفحص: ' + err.message);
+      }
+    }
+
+    function viewAttachmentData(base64Data, filename) {
+      if (!base64Data) return;
+      const win = window.open();
+      if (base64Data.startsWith('data:image')) {
+        win.document.write(`<html dir="rtl"><head><title>${filename || 'مرفق'}</title><style>body{margin:0;display:flex;align-items:center;justify-content:center;background:#1e293b;min-height:100vh;}</style></head><body><img src="${base64Data}" style="max-width:95%;max-height:95vh;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.5);"></body></html>`);
+      } else {
+        win.document.write(`<html dir="rtl"><head><title>${filename || 'مرفق'}</title><style>body{margin:0;}</style></head><body><iframe src="${base64Data}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100vh;" allowfullscreen></iframe></body></html>`);
+      }
+    }
+
+    function viewDeviceAttachment(id) {
+      const dev = devices.find(d => d.id === id);
+      if (!dev) return;
+      if (dev.attachment) {
+        viewAttachmentData(dev.attachment.data, dev.attachment.name);
+      } else if (dev.history && dev.history.find(h => h.attachment)) {
+        const item = dev.history.find(h => h.attachment);
+        viewAttachmentData(item.attachment.data, item.attachment.name);
+      } else {
+        alert('لا يوجد مرفق مسجل لهذا الجهاز.');
       }
     }
 
@@ -1003,7 +1469,19 @@
       const dev = devices.find(d => d.id === id);
       if (!dev) return;
 
+      activeHistoryDeviceId = dev.id;
       document.getElementById('historyDeviceTitle').innerText = `${dev.name} [S/N: ${dev.sn}] - ${dev.lab === 'CORRIDOR' ? 'الممر الرئيسي' : 'معمل ' + dev.lab}`;
+
+      const specsBox = document.getElementById('historyDeviceSpecsBox');
+      specsBox.innerHTML = `
+        <div class="grid grid-cols-2 gap-2">
+          <div><span class="text-slate-500">الشركة:</span> <span class="font-bold text-slate-800">${dev.brand || '—'}</span></div>
+          <div><span class="text-slate-500">الحالة:</span> <span class="font-bold text-slate-800">${dev.status || '—'}</span></div>
+          <div><span class="text-slate-500">المعايرة:</span> <span class="font-bold text-slate-800">${dev.calibParams || '—'}</span></div>
+          <div><span class="text-slate-500">المدى والسماح:</span> <span class="font-bold font-mono text-slate-800">${dev.tolerance || dev.rangeAccuracy || '—'}</span></div>
+        </div>
+      `;
+
       const container = document.getElementById('historyTimeline');
       container.innerHTML = '';
 
@@ -1011,16 +1489,28 @@
       if (history.length === 0) {
         container.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">لا توجد سجلات كشف سابقة مسجلة لهذا الجهاز.</p>';
       } else {
-        history.forEach(item => {
+        history.forEach((item, idx) => {
           const div = document.createElement('div');
-          div.className = "border-r-2 border-vacsera-red pr-3 py-1 space-y-1 relative";
+          div.className = "border-r-2 border-vacsera-red pr-3 py-1 space-y-1 relative bg-slate-50 p-2 rounded-xl border border-slate-200";
+
+          let attachmentBtn = '';
+          if (item.attachment && item.attachment.data) {
+            attachmentBtn = `
+              <button onclick='viewAttachmentData("${item.attachment.data}", "${item.attachment.name || 'مرفق'}")' class="text-[11px] font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 px-2 py-0.5 rounded flex items-center gap-1 transition">
+                <i class="fa-solid fa-paperclip"></i>
+                <span>عرض شهادة/تقرير الفحص</span>
+              </button>
+            `;
+          }
+
           div.innerHTML = `
             <div class="flex items-center justify-between">
               <span class="text-xs font-black text-slate-800">${item.type || 'فحص دوري'}</span>
-              <span class="text-[11px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">${item.date}</span>
+              <span class="text-[11px] font-mono text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">${item.date}</span>
             </div>
             <div class="text-xs text-slate-600"><span class="font-bold">القائم بالفحص:</span> ${item.inspector || 'مهندس الصيانة'}</div>
-            ${item.notes ? `<div class="text-xs text-slate-500 bg-slate-50 p-2 rounded-lg">${item.notes}</div>` : ''}
+            ${item.notes ? `<div class="text-xs text-slate-600 bg-white p-2 rounded-lg border border-slate-100">${item.notes}</div>` : ''}
+            ${attachmentBtn ? `<div class="pt-1">${attachmentBtn}</div>` : ''}
           `;
           container.appendChild(div);
         });
@@ -1029,10 +1519,17 @@
       document.getElementById('historyModal').classList.remove('hidden');
     }
 
+    function openQRModalFromHistory() {
+      if (activeHistoryDeviceId) {
+        openQRModal(activeHistoryDeviceId);
+      }
+    }
+
     function closeHistoryModal() {
       document.getElementById('historyModal').classList.add('hidden');
     }
 
+    // Feature 2: Smart Direct QR Generator with URL navigation
     function openQRModal(id) {
       const dev = devices.find(d => d.id === id);
       if (!dev) return;
@@ -1045,9 +1542,10 @@
       const container = document.getElementById('qrContainer');
       container.innerHTML = '';
 
-      const qrData = `VACSERA|POLIO|${dev.lab}|SN:${dev.sn}|NAME:${dev.name}`;
+      // Direct URL that opens this exact device card when scanned by phone camera
+      const directUrl = `${window.location.origin}${window.location.pathname}?dev=${encodeURIComponent(dev.id)}`;
       new QRCode(container, {
-        text: qrData,
+        text: directUrl,
         width: 140,
         height: 140,
         colorDark: "#000000",
@@ -1060,6 +1558,134 @@
 
     function closeQRModal() {
       document.getElementById('qrModal').classList.add('hidden');
+    }
+
+    function printAssetTag() {
+      document.body.classList.remove('printing-report');
+      document.body.classList.add('printing-qr');
+      window.print();
+      document.body.classList.remove('printing-qr');
+    }
+
+    // Feature 2: Camera Scanner Modal using Html5Qrcode
+    function openScannerModal() {
+      const modal = document.getElementById('scannerModal');
+      modal.classList.remove('hidden');
+
+      setTimeout(() => {
+        try {
+          html5QrScanner = new Html5Qrcode("qr-reader");
+          html5QrScanner.start(
+            { facingMode: "environment" },
+            {
+              fps: 10,
+              qrbox: { width: 220, height: 220 }
+            },
+            (decodedText) => {
+              // Beep sound
+              try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(800, ctx.currentTime);
+                osc.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.15);
+              } catch (_) {}
+
+              closeScannerModal();
+
+              // Check if decodedText is a URL with ?dev=... or direct S/N or raw ID
+              let targetId = decodedText;
+              if (decodedText.includes('dev=')) {
+                try {
+                  const url = new URL(decodedText);
+                  targetId = url.searchParams.get('dev');
+                } catch (_) {
+                  const match = decodedText.match(/dev=([^&]+)/);
+                  if (match) targetId = decodeURIComponent(match[1]);
+                }
+              }
+
+              const found = devices.find(d => d.id === targetId || d.sn === targetId || decodedText.includes(d.sn));
+              if (found) {
+                openHistoryModal(found.id);
+              } else {
+                alert(`تم مسح الباركود بنجاح:\n${decodedText}\n(لم يتم العثور على جهاز يطابق هذا الكود في قاعدة البيانات)`);
+              }
+            },
+            (errorMessage) => {
+              // ignore frame errors
+            }
+          ).catch(err => {
+            console.error("Camera start error:", err);
+            document.getElementById('qrReaderContainer').innerHTML = `<p class="p-4 text-center text-xs text-rose-400">تعذر فتح الكاميرا: يرجى التأكد من إعطاء إذن الوصول للكاميرا في المتصفح أو فتح الرابط عبر HTTPS.</p>`;
+          });
+        } catch (e) {
+          console.error(e);
+        }
+      }, 300);
+    }
+
+    function closeScannerModal() {
+      if (html5QrScanner) {
+        html5QrScanner.stop().then(() => {
+          html5QrScanner.clear();
+          html5QrScanner = null;
+        }).catch(() => {
+          html5QrScanner = null;
+        });
+      }
+      document.getElementById('scannerModal').classList.add('hidden');
+    }
+
+    // Feature 6: Official A4 Report Modal Logic
+    function openOfficialReportModal() {
+      const modal = document.getElementById('reportModal');
+      const dateEl = document.getElementById('reportGeneratedDate');
+      dateEl.innerText = `تاريخ إصدار التقرير: ${new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}`;
+
+      document.getElementById('repStatTotal').innerText = devices.length;
+      document.getElementById('repStatOperational').innerText = devices.filter(d => normalizeStatus(d.status) === 'سليم').length;
+      document.getElementById('repStatMaintenance').innerText = devices.filter(d => normalizeStatus(d.status) === 'صيانة').length;
+      document.getElementById('repStatOut').innerText = devices.filter(d => normalizeStatus(d.status) === 'خارج الخدمة').length;
+
+      const tbody = document.getElementById('reportTableBody');
+      tbody.innerHTML = '';
+
+      devices.forEach((dev, index) => {
+        const tr = document.createElement('tr');
+        tr.className = index % 2 === 0 ? 'bg-white' : 'bg-slate-50';
+
+        const due = getDueStatus(dev);
+        const normSt = normalizeStatus(dev.status);
+
+        tr.innerHTML = `
+          <td class="border border-slate-300 p-1.5 text-center font-bold">${index + 1}</td>
+          <td class="border border-slate-300 p-1.5 font-bold">${dev.name || '—'}</td>
+          <td class="border border-slate-300 p-1.5 text-slate-700">${dev.brand || '—'}</td>
+          <td class="border border-slate-300 p-1.5 font-mono font-bold">${dev.sn || '—'}</td>
+          <td class="border border-slate-300 p-1.5">${dev.lab === 'CORRIDOR' ? 'الممر الرئيسي' : 'معمل ' + dev.lab}</td>
+          <td class="border border-slate-300 p-1.5 text-[9px] text-slate-600">${dev.tolerance || dev.rangeAccuracy || dev.calibParams || '—'}</td>
+          <td class="border border-slate-300 p-1.5 font-mono">${dev.lastDate || '—'}</td>
+          <td class="border border-slate-300 p-1.5 font-mono font-bold">${due.nextDateStr || '—'}</td>
+          <td class="border border-slate-300 p-1.5 text-center font-bold">${normSt}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeOfficialReportModal() {
+      document.getElementById('reportModal').classList.add('hidden');
+    }
+
+    function printOfficialReport() {
+      document.body.classList.remove('printing-qr');
+      document.body.classList.add('printing-report');
+      window.print();
+      document.body.classList.remove('printing-report');
     }
 
     function handleLogoUpload(event) {
@@ -1090,7 +1716,7 @@
 
       devices.forEach(d => {
         const next = getNextDueDate(d.lastDate, d.intervalMonths);
-        const nextDateStr = next ? next.toISOString().split('T')[0] : '';
+        const nextDateStr = next ? formatISODate(next) : '';
         const row = [
           `"${(d.name || '').replace(/"/g, '""')}"`,
           `"${(d.brand || '').replace(/"/g, '""')}"`,
@@ -1146,7 +1772,7 @@
 
             if (existingSNs.has(sn.toLowerCase())) {
               skippedDuplicates++;
-              continue; // تخطي الرقم التسلسلي المكرر
+              continue;
             }
             existingSNs.add(sn.toLowerCase());
             const lab = cols[3] || 'PCR';
