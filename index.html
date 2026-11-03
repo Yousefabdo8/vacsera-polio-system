@@ -139,7 +139,7 @@
     <!-- KPI / Statistics Cards -->
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
       
-      <div onclick="filterByCard('ALL')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-vacsera-red transition">
+      <div id="card_ALL" onclick="filterByCard('ALL')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-vacsera-red transition">
         <div class="flex items-center justify-between mb-1">
           <span class="text-xs text-slate-500 font-bold">إجمالي الأجهزة</span>
           <i class="fa-solid fa-boxes-stacked text-slate-400 text-sm"></i>
@@ -147,7 +147,7 @@
         <div class="text-2xl font-black text-slate-900" id="statTotal">0</div>
       </div>
 
-      <div onclick="filterByCard('OPERATIONAL')" class="bg-white p-3.5 rounded-2xl border border-emerald-100 shadow-xs cursor-pointer hover:border-emerald-500 transition">
+      <div id="card_OPERATIONAL" onclick="filterByCard('OPERATIONAL')" class="bg-white p-3.5 rounded-2xl border border-emerald-100 shadow-xs cursor-pointer hover:border-emerald-500 transition">
         <div class="flex items-center justify-between mb-1">
           <span class="text-xs text-emerald-700 font-bold">تعمل بكفاءة</span>
           <i class="fa-solid fa-circle-check text-emerald-500 text-sm"></i>
@@ -155,7 +155,7 @@
         <div class="text-2xl font-black text-emerald-600" id="statOperational">0</div>
       </div>
 
-      <div onclick="filterByCard('MAINTENANCE')" class="bg-white p-3.5 rounded-2xl border border-amber-100 shadow-xs cursor-pointer hover:border-amber-500 transition">
+      <div id="card_MAINTENANCE" onclick="filterByCard('MAINTENANCE')" class="bg-white p-3.5 rounded-2xl border border-amber-100 shadow-xs cursor-pointer hover:border-amber-500 transition">
         <div class="flex items-center justify-between mb-1">
           <span class="text-xs text-amber-700 font-bold">تحت الصيانة</span>
           <i class="fa-solid fa-screwdriver-wrench text-amber-500 text-sm"></i>
@@ -163,7 +163,7 @@
         <div class="text-2xl font-black text-amber-600" id="statMaintenance">0</div>
       </div>
 
-      <div onclick="filterByCard('OVERDUE')" class="bg-red-50 p-3.5 rounded-2xl border border-red-200 shadow-xs cursor-pointer hover:border-red-500 transition">
+      <div id="card_OVERDUE" onclick="filterByCard('OVERDUE')" class="bg-red-50 p-3.5 rounded-2xl border border-red-200 shadow-xs cursor-pointer hover:border-red-500 transition">
         <div class="flex items-center justify-between mb-1">
           <span class="text-xs text-red-700 font-bold">متأخر عن الفحص</span>
           <i class="fa-solid fa-triangle-exclamation text-red-500 text-sm animate-pulse"></i>
@@ -171,7 +171,7 @@
         <div class="text-2xl font-black text-red-600" id="statOverdue">0</div>
       </div>
 
-      <div onclick="filterByCard('UPCOMING')" class="bg-amber-50 p-3.5 rounded-2xl border border-amber-200 shadow-xs cursor-pointer hover:border-amber-500 transition">
+      <div id="card_UPCOMING" onclick="filterByCard('UPCOMING')" class="bg-amber-50 p-3.5 rounded-2xl border border-amber-200 shadow-xs cursor-pointer hover:border-amber-500 transition">
         <div class="flex items-center justify-between mb-1">
           <span class="text-xs text-amber-800 font-bold">فحص قريباً</span>
           <i class="fa-solid fa-clock-rotate-left text-amber-500 text-sm"></i>
@@ -179,7 +179,7 @@
         <div class="text-2xl font-black text-amber-700" id="statUpcoming">0</div>
       </div>
 
-      <div onclick="filterByCard('OUT')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-slate-500 transition">
+      <div id="card_OUT" onclick="filterByCard('OUT')" class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs cursor-pointer hover:border-slate-500 transition">
         <div class="flex items-center justify-between mb-1">
           <span class="text-xs text-slate-600 font-bold">خارج الخدمة</span>
           <i class="fa-solid fa-ban text-slate-400 text-sm"></i>
@@ -196,20 +196,22 @@
         <!-- Live Search -->
         <div class="relative flex-1 min-w-[200px]">
           <i class="fa-solid fa-magnifying-glass absolute right-3 top-3 text-slate-400 text-sm"></i>
-          <input type="text" id="searchInput" oninput="renderTable()" placeholder="بحث سريع: اسم الجهاز، الشركة، S/N..." class="w-full pr-9 pl-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-vacsera-red">
+          <input type="text" id="searchInput" oninput="onFilterChange()" placeholder="بحث سريع: اسم الجهاز، الشركة، S/N..." class="w-full pr-9 pl-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-vacsera-red">
         </div>
 
         <!-- Lab Filter -->
-        <select id="labFilter" onchange="renderTable()" class="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-vacsera-red">
+        <select id="labFilter" onchange="onFilterChange()" class="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-vacsera-red">
           <option value="ALL">جميع المعامل (All Labs)</option>
           <option value="AFP">معمل 1 (AFP)</option>
           <option value="ENV">معمل 2 (ENV)</option>
           <option value="PCR">معمل 3 (PCR)</option>
           <option value="C.C">معمل 4 (C.C)</option>
+          <option value="SEQ">معمل 5 (SEQ)</option>
+          <option value="CORRIDOR">الممر الرئيسي (Main Corridor)</option>
         </select>
 
         <!-- Status Filter -->
-        <select id="statusFilter" onchange="renderTable()" class="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-vacsera-red">
+        <select id="statusFilter" onchange="onFilterChange()" class="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-vacsera-red">
           <option value="ALL">جميع الحالات</option>
           <option value="سليم">يعمل بكفاءة</option>
           <option value="صيانة">تحت الصيانة</option>
@@ -218,7 +220,7 @@
 
         <!-- Overdue Filter Checkbox -->
         <label class="flex items-center gap-2 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-xl cursor-pointer">
-          <input type="checkbox" id="overdueOnly" onchange="renderTable()" class="rounded text-vacsera-red focus:ring-0">
+          <input type="checkbox" id="overdueOnly" onchange="onFilterChange()" class="rounded text-vacsera-red focus:ring-0">
           <span>المتأخرة عن موعد الفحص فقط</span>
         </label>
       </div>
@@ -252,8 +254,11 @@
       </div>
       
       <div id="emptyState" class="hidden p-12 text-center text-slate-400">
-        <i class="fa-solid fa-folder-open text-4xl mb-3 text-slate-300"></i>
-        <p class="font-bold">لا توجد أجهزة مطابقة للبحث أو الفلتر المختار</p>
+        <i class="fa-solid fa-filter-circle-xmark text-4xl mb-3 text-slate-300"></i>
+        <p class="font-bold text-slate-600 mb-2">لا توجد أجهزة مطابقة للفلتر المختار حالياً</p>
+        <button onclick="resetAllFilters()" class="text-xs font-bold text-vacsera-red bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-xl transition">
+          إلغاء الفلاتر وعرض جميع الأجهزة
+        </button>
       </div>
     </div>
 
@@ -298,12 +303,14 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">المعمل <span class="text-red-500">*</span></label>
+            <label class="block text-xs font-bold text-slate-700 mb-1">المعمل / المكان <span class="text-red-500">*</span></label>
             <select id="devLab" required class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red font-bold">
               <option value="AFP">معمل 1 (AFP)</option>
               <option value="ENV">معمل 2 (ENV)</option>
               <option value="PCR">معمل 3 (PCR)</option>
               <option value="C.C">معمل 4 (C.C)</option>
+              <option value="SEQ">معمل 5 (SEQ)</option>
+              <option value="CORRIDOR">الممر الرئيسي (Main Corridor)</option>
             </select>
           </div>
           <div>
@@ -568,14 +575,75 @@
 
     let devices = [];
     let currentFilterCard = 'ALL';
+    function onFilterChange() {
+      currentFilterCard = 'ALL';
+      updateCardStyles();
+      renderTable();
+    }
+
+    function updateCardStyles() {
+      const cards = ['ALL', 'OPERATIONAL', 'MAINTENANCE', 'OVERDUE', 'UPCOMING', 'OUT'];
+      cards.forEach(c => {
+        const el = document.getElementById('card_' + c);
+        if (el) {
+          if (c === currentFilterCard) {
+            el.classList.add('ring-2', 'ring-vacsera-red', 'scale-[1.02]');
+          } else {
+            el.classList.remove('ring-2', 'ring-vacsera-red', 'scale-[1.02]');
+          }
+        }
+      });
+    }
+
+    function resetAllFilters() {
+      currentFilterCard = 'ALL';
+      document.getElementById('searchInput').value = '';
+      document.getElementById('labFilter').value = 'ALL';
+      document.getElementById('statusFilter').value = 'ALL';
+      document.getElementById('overdueOnly').checked = false;
+      updateCardStyles();
+      renderTable();
+    }
+
+
+        function parseSafeDate(dateStr) {
+      if (!dateStr || typeof dateStr !== 'string') return null;
+      dateStr = dateStr.trim();
+      if (!dateStr) return null;
+
+      // Handle DD/MM/YYYY or DD-MM-YYYY format
+      const parts = dateStr.split(/[-/]/);
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          // YYYY-MM-DD
+          const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+          return isNaN(d.getTime()) ? null : d;
+        } else if (parts[2].length === 4) {
+          // DD/MM/YYYY
+          const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+          return isNaN(d.getTime()) ? null : d;
+        }
+      }
+      const d = new Date(dateStr);
+      return isNaN(d.getTime()) ? null : d;
+    }
 
     function getNextDueDate(lastDateStr, intervalMonths) {
       if (!lastDateStr || intervalMonths === 'CNN') return null;
-      const d = new Date(lastDateStr);
+      const d = parseSafeDate(lastDateStr);
+      if (!d) return null;
       const m = parseInt(intervalMonths);
       if (isNaN(m) || m <= 0) return null;
       d.setMonth(d.getMonth() + m);
-      return d;
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    function formatISODate(d) {
+      if (!d || isNaN(d.getTime())) return '';
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
 
     function getDueStatus(device) {
@@ -591,13 +659,14 @@
 
       const diffTime = nextDate - today;
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const nextDateStr = formatISODate(nextDate);
 
       if (diffDays < 0) {
-        return { text: `متأخر (${Math.abs(diffDays)} يوم)`, class: 'bg-red-100 text-red-700 border border-red-200', isOverdue: true, isUpcoming: false, nextDateStr: nextDate.toISOString().split('T')[0] };
+        return { text: `متأخر (${Math.abs(diffDays)} يوم)`, class: 'bg-red-100 text-red-700 border border-red-200', isOverdue: true, isUpcoming: false, nextDateStr: nextDateStr };
       } else if (diffDays <= 14) {
-        return { text: `مستحق خلال ${diffDays} يوم`, class: 'bg-amber-100 text-amber-800 border border-amber-200', isOverdue: false, isUpcoming: true, nextDateStr: nextDate.toISOString().split('T')[0] };
+        return { text: `مستحق خلال ${diffDays} يوم`, class: 'bg-amber-100 text-amber-800 border border-amber-200', isOverdue: false, isUpcoming: true, nextDateStr: nextDateStr };
       } else {
-        return { text: 'سارٍ', class: 'bg-emerald-50 text-emerald-700', isOverdue: false, isUpcoming: false, nextDateStr: nextDate.toISOString().split('T')[0] };
+        return { text: 'سارٍ', class: 'bg-emerald-50 text-emerald-700', isOverdue: false, isUpcoming: false, nextDateStr: nextDateStr };
       }
     }
 
@@ -681,13 +750,14 @@
           matchesOverdue = dueInfo.isOverdue;
         }
 
-        if (currentFilterCard === 'OPERATIONAL') return matchesSearch && matchesLab && matchesStatus && device.status === 'سليم';
-        if (currentFilterCard === 'MAINTENANCE') return matchesSearch && matchesLab && matchesStatus && device.status === 'صيانة';
-        if (currentFilterCard === 'OUT') return matchesSearch && matchesLab && matchesStatus && device.status === 'خارج الخدمة';
-        if (currentFilterCard === 'OVERDUE') return matchesSearch && matchesLab && matchesStatus && dueInfo.isOverdue;
-        if (currentFilterCard === 'UPCOMING') return matchesSearch && matchesLab && matchesStatus && dueInfo.isUpcoming;
+        let matchesCard = true;
+        if (currentFilterCard === 'OPERATIONAL') matchesCard = (device.status === 'سليم');
+        else if (currentFilterCard === 'MAINTENANCE') matchesCard = (device.status === 'صيانة');
+        else if (currentFilterCard === 'OUT') matchesCard = (device.status === 'خارج الخدمة');
+        else if (currentFilterCard === 'OVERDUE') matchesCard = dueInfo.isOverdue;
+        else if (currentFilterCard === 'UPCOMING') matchesCard = dueInfo.isUpcoming;
 
-        return matchesSearch && matchesLab && matchesStatus && matchesOverdue;
+        return matchesSearch && matchesLab && matchesStatus && matchesOverdue && matchesCard;
       });
 
       document.getElementById('displayedCount').innerText = filtered.length;
@@ -708,6 +778,9 @@
         else if (device.lab === 'ENV') labBadge = '<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full text-xs font-bold">معمل 2 (ENV)</span>';
         else if (device.lab === 'PCR') labBadge = '<span class="bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-0.5 rounded-full text-xs font-bold">معمل 3 (PCR)</span>';
         else if (device.lab === 'C.C') labBadge = '<span class="bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 rounded-full text-xs font-bold">معمل 4 (C.C)</span>';
+        else if (device.lab === 'SEQ') labBadge = '<span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full text-xs font-bold">معمل 5 (SEQ)</span>';
+        else if (device.lab === 'CORRIDOR') labBadge = '<span class="bg-slate-100 text-slate-700 border border-slate-300 px-2.5 py-0.5 rounded-full text-xs font-bold">الممر الرئيسي (Corridor)</span>';
+        else labBadge = `<span class="bg-slate-50 text-slate-700 border border-slate-200 px-2.5 py-0.5 rounded-full text-xs font-bold">${device.lab || 'عام'}</span>`;
 
         let statusBadge = '';
         if (device.status === 'سليم') statusBadge = '<span class="inline-flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full font-bold text-xs"><i class="fa-solid fa-circle-check text-[10px]"></i> كفاءة</span>';
@@ -765,6 +838,7 @@
     function filterByCard(cardType) {
       currentFilterCard = cardType;
       document.getElementById('overdueOnly').checked = (cardType === 'OVERDUE');
+      updateCardStyles();
       renderTable();
     }
 
@@ -815,6 +889,18 @@
       const name = document.getElementById('devName').value.trim();
       const brand = document.getElementById('devBrand').value.trim();
       const sn = document.getElementById('devSN').value.trim();
+
+      // التحقق من عدم تكرار الرقم التسلسلي (S/N)
+      const isDuplicate = devices.some(d => {
+        if (id && d.id === id) return false; // نفس الجهاز في حالة التعديل
+        return d.sn && d.sn.trim().toLowerCase() === sn.toLowerCase();
+      });
+
+      if (isDuplicate) {
+        alert(`عفواً! الرقم التسلسلي (S/N: ${sn}) مسجل مسبقاً لجهاز آخر في المنظومة. يرجى مراجعة الرقم.`);
+        document.getElementById('devSN').focus();
+        return;
+      }
       const lab = document.getElementById('devLab').value;
       const status = document.getElementById('devStatus').value;
       const lastDate = document.getElementById('devLastDate').value;
@@ -864,7 +950,7 @@
       if (!dev) return;
 
       document.getElementById('inspectDeviceId').value = dev.id;
-      document.getElementById('inspectDeviceName').innerText = `${dev.name} (${dev.sn}) - معمل ${dev.lab}`;
+      document.getElementById('inspectDeviceName').innerText = `${dev.name} (${dev.sn}) - ${dev.lab === 'CORRIDOR' ? 'الممر الرئيسي' : 'معمل ' + dev.lab}`;
       document.getElementById('inspDate').value = new Date().toISOString().split('T')[0];
       document.getElementById('inspStatus').value = dev.status;
       document.getElementById('inspInspector').value = '';
@@ -917,7 +1003,7 @@
       const dev = devices.find(d => d.id === id);
       if (!dev) return;
 
-      document.getElementById('historyDeviceTitle').innerText = `${dev.name} [S/N: ${dev.sn}] - معمل ${dev.lab}`;
+      document.getElementById('historyDeviceTitle').innerText = `${dev.name} [S/N: ${dev.sn}] - ${dev.lab === 'CORRIDOR' ? 'الممر الرئيسي' : 'معمل ' + dev.lab}`;
       const container = document.getElementById('historyTimeline');
       container.innerHTML = '';
 
@@ -954,7 +1040,7 @@
       document.getElementById('qrDevName').innerText = dev.name;
       document.getElementById('qrDevSN').innerText = dev.sn;
       document.getElementById('qrDevBrand').innerText = dev.brand;
-      document.getElementById('qrLabName').innerText = `معمل ${dev.lab}`;
+      document.getElementById('qrLabName').innerText = dev.lab === 'CORRIDOR' ? 'الممر الرئيسي (Main Corridor)' : `معمل ${dev.lab}`;
 
       const container = document.getElementById('qrContainer');
       container.innerHTML = '';
@@ -1048,12 +1134,21 @@
         let importedCount = 0;
         const batch = db.batch();
 
+        const existingSNs = new Set(devices.map(d => (d.sn || '').trim().toLowerCase()));
+        let skippedDuplicates = 0;
+
         for (let i = 1; i < lines.length; i++) {
           const cols = lines[i].split(',').map(c => c.replace(/^"|"$/g, '').trim());
           if (cols.length >= 4 && cols[0]) {
             const name = cols[0];
             const brand = cols[1] || 'غير محدد';
             const sn = cols[2] || `SN-IMP-${Date.now()}-${i}`;
+
+            if (existingSNs.has(sn.toLowerCase())) {
+              skippedDuplicates++;
+              continue; // تخطي الرقم التسلسلي المكرر
+            }
+            existingSNs.add(sn.toLowerCase());
             const lab = cols[3] || 'PCR';
             const lastDate = cols[4] || new Date().toISOString().split('T')[0];
             const rawIntervalVal = cols[5] ? cols[5].trim() : '6';
@@ -1074,7 +1169,11 @@
 
         try {
           await batch.commit();
-          alert(`تم استيراد ${importedCount} جهاز بنجاح وحفظها سحابياً!`);
+          let msg = `تم استيراد ${importedCount} جهاز بنجاح وحفظها سحابياً!`;
+          if (skippedDuplicates > 0) {
+            msg += `\n(تم تخطي ${skippedDuplicates} جهاز لأن الرقم التسلسلي S/N مسجل مسبقاً)`;
+          }
+          alert(msg);
         } catch (err) {
           alert('خطأ أثناء الاستيراد السحابي: ' + err.message);
         }
