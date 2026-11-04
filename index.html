@@ -1145,7 +1145,7 @@
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
         const labCls = LABS[device.lab] ? LABS[device.lab].cls : 'bg-slate-50 text-slate-700 border-slate-200';
-        const labBadge = `<span class="${labCls} border px-2.5 py-0.5 rounded-full text-xs font-bold">${esc(labLabel(device.lab))}</span>`;
+        const labBadge = `<span class="${labCls} border px-2.5 py-0.5 rounded-full text-xs font-bold whitespace-nowrap inline-block">${esc(labLabel(device.lab))}</span>`;
         const rs = normalizeStatus(device.status);
         let statusBadge;
         if (rs === 'سليم') statusBadge = '<span class="inline-flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full font-bold text-xs"><i class="fa-solid fa-circle-check text-[10px]"></i> كفاءة</span>';
@@ -1194,9 +1194,9 @@
             <div class="flex items-center gap-1.5 flex-wrap"><span>${esc(device.sn) || '—'}</span>
             ${dup ? '<span class="bg-rose-100 text-rose-700 border border-rose-300 text-[10px] px-1.5 py-0.5 rounded-md font-bold"><i class="fa-solid fa-triangle-exclamation text-[9px]"></i> مكرر</span>' : ''}</div>
           </td>
-          <td class="py-3.5 px-4">${labBadge}</td>
-          <td class="py-3.5 px-4 text-slate-600 text-xs">${esc(device.lastDate) || '—'}</td>
-          <td class="py-3.5 px-4"><span class="text-xs px-2.5 py-1 rounded-lg font-bold ${due.class}">${esc(due.nextDateStr)} (${esc(due.text)})</span></td>
+          <td class="py-3.5 px-4 whitespace-nowrap">${labBadge}</td>
+          <td class="py-3.5 px-4 text-slate-600 text-xs whitespace-nowrap">${esc(device.lastDate) || '—'}</td>
+          <td class="py-3.5 px-4 whitespace-nowrap"><span class="text-xs px-2.5 py-1 rounded-lg font-bold whitespace-nowrap inline-block ${due.class}">${esc(due.nextDateStr)} (${esc(due.text)})</span></td>
           <td class="py-3.5 px-4 text-center">${attHtml}</td>
           <td class="py-3.5 px-4 text-center">${statusBadge}</td>
           <td class="py-3.5 px-4 text-center">
