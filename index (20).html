@@ -1,0 +1,2466 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#D32828">
+  <title>فاكسيرا VACSERA | نظام Polio لإدارة وتتبع الأجهزة المعملية</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { vacsera: { red: '#D32828', redDark: '#A61A1A', black: '#111827', grayBg: '#F4F5F7' } },
+          fontFamily: { sans: ['Cairo', 'Tajawal', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; }
+    .modal-backdrop { background-color: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); }
+    .hbtn { display:inline-flex; align-items:center; gap:.4rem; font-size:.75rem; font-weight:700; padding:.5rem .75rem; border-radius:.75rem; background:#f1f5f9; color:#334155; transition:.15s; position:relative; cursor:pointer; }
+    .hbtn:hover { background:#e2e8f0; }
+    #labelsSheet { display:none; }
+
+    @media print {
+      body * { visibility: hidden !important; }
+      body.printing-qr #printModalContent, body.printing-qr #printModalContent * { visibility: visible !important; }
+      body.printing-qr #printModalContent { position:absolute; left:0; top:0; width:100%; margin:0; padding:10px; box-shadow:none !important; border:2px solid #000 !important; }
+
+      body.printing-report #officialReportContainer, body.printing-report #officialReportContainer * { visibility: visible !important; }
+      body.printing-report #officialReportContainer { position:absolute; left:0; top:0; width:100%; margin:0; padding:0; background:white !important; }
+
+      body.printing-labels #labelsSheet, body.printing-labels #labelsSheet * { visibility: visible !important; }
+      body.printing-labels #labelsSheet { display:grid !important; position:absolute; left:0; top:0; width:100%; grid-template-columns:repeat(3,1fr); gap:3mm; }
+      .label-item { border:1px solid #000; padding:2.5mm; display:flex; gap:2.5mm; align-items:center; break-inside:avoid; font-size:9px; background:#fff; }
+      .label-item .lt { line-height:1.5; }
+      .no-print { display:none !important; }
+      @page { size: A4 portrait; margin: 12mm; }
+    }
+  </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col pb-16">
+
+  <div id="toastBox" class="fixed top-4 left-1/2 -translate-x-1/2 z-[70] flex flex-col gap-2 no-print"></div>
+
+  <!-- Header -->
+  <header class="bg-white border-b-2 border-vacsera-red sticky top-0 z-30 shadow-sm no-print">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
+
+      <div class="flex items-center gap-4">
+        <div class="relative group cursor-pointer" onclick="document.getElementById('logoFileInput').click()" title="اضغط لرفع لوجو من جهازك">
+          <div id="vacseraLogoContainer" class="h-12 w-40 flex items-center justify-center bg-white p-1 rounded-xl border border-slate-200 hover:border-red-300 transition">
+            <svg viewBox="0 0 280 80" class="w-full h-full select-none" xmlns="http://www.w3.org/2000/svg">
+              <polygon points="0,78 280,78 280,26 80,62 0,78" fill="#111827" />
+              <text x="5" y="66" font-family="'Cairo', 'Impact', sans-serif" font-weight="900" font-style="italic" font-size="74" fill="#D32828" letter-spacing="-2">VACSERA</text>
+              <g clip-path="url(#logoCutExact)">
+                <clipPath id="logoCutExact"><polygon points="0,78 280,78 280,26 80,62 0,78" /></clipPath>
+                <text x="5" y="66" font-family="'Cairo', 'Impact', sans-serif" font-weight="900" font-style="italic" font-size="74" fill="#FFFFFF" letter-spacing="-2">VACSERA</text>
+              </g>
+            </svg>
+          </div>
+          <span class="absolute inset-0 bg-black/60 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[11px] font-bold transition">
+            <i class="fa-solid fa-camera ml-1"></i> تغيير الشعار
+          </span>
+          <input type="file" id="logoFileInput" accept="image/*" class="hidden" onchange="handleLogoUpload(event)">
+        </div>
+
+        <div class="border-r-2 border-slate-200 pr-4">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="bg-vacsera-red text-white text-xs font-black px-2.5 py-0.5 rounded tracking-wider">POLIO</span>
+            <h1 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight">نظام إدارة ومتابعة الأجهزة الطبية</h1>
+            <span id="cloudStatusBadge" class="bg-emerald-100 text-emerald-700 text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> سحابي متصل
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 font-medium">الشركة المصرية لإنتاج الأمصال واللقاحات والأدوية (فاكسيرا - VACSERA)</p>
+        </div>
+      </div>
+
+      <div class="flex items-center flex-wrap gap-2">
+        <button onclick="ensureUser(true)" class="hbtn" title="المستخدم الحالي (يُسجَّل في سجل التدقيق)">
+          <i class="fa-solid fa-user text-slate-500"></i><span id="userChip">حدد اسمك</span>
+        </button>
+
+        <button onclick="openAlerts()" class="hbtn" title="التنبيهات">
+          <i class="fa-solid fa-bell text-amber-500"></i><span>التنبيهات</span>
+          <span id="alertBadge" class="hidden absolute -top-1.5 -left-1.5 bg-red-600 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">0</span>
+        </button>
+        <button onclick="openCalendar()" class="hbtn"><i class="fa-solid fa-calendar-days text-sky-600"></i><span>التقويم</span></button>
+        <button onclick="openAnalytics()" class="hbtn"><i class="fa-solid fa-chart-column text-purple-600"></i><span>التحليلات</span></button>
+        <button onclick="openAuditModal()" class="hbtn"><i class="fa-solid fa-shield-halved text-slate-600"></i><span>سجل التدقيق</span></button>
+
+        <button onclick="openScannerModal()" class="hbtn !bg-indigo-50 !text-indigo-700 border border-indigo-200">
+          <i class="fa-solid fa-expand"></i><span>مسح QR</span>
+        </button>
+        <button onclick="openOfficialReportModal()" class="hbtn"><i class="fa-solid fa-print"></i><span>تقرير A4</span></button>
+
+        <label class="hbtn">
+          <i class="fa-solid fa-file-excel text-emerald-600"></i><span>استيراد Excel/CSV</span>
+          <input type="file" id="importFileInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="importFile(event)">
+        </label>
+        <button onclick="exportExcel()" class="hbtn"><i class="fa-solid fa-file-arrow-down text-blue-600"></i><span>تصدير Excel</span></button>
+
+        <button onclick="openDeviceModal()" class="bg-vacsera-red hover:bg-vacsera-redDark text-white text-xs sm:text-sm font-bold py-2 px-4 rounded-xl flex items-center gap-2 shadow-sm transition">
+          <i class="fa-solid fa-circle-plus"></i><span>إضافة جهاز</span>
+        </button>
+      </div>
+    </div>
+    <div id="alertStrip" class="hidden bg-red-50 border-t border-red-200 text-red-800 text-xs font-bold px-4 py-2 cursor-pointer text-center" onclick="openAlerts()"></div>
+  </header>
+
+  <!-- Main -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6 no-print">
+
+    <div id="viewTabs" class="flex flex-wrap gap-2 bg-white p-1.5 rounded-2xl border border-slate-200 w-fit"></div>
+
+    <div id="devicesView" class="space-y-6">
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+      <div id="card_ALL" onclick="filterByCard('ALL')" class="bg-white p-3.5 rounded-2xl border border-slate-200 cursor-pointer hover:border-vacsera-red transition">
+        <div class="flex items-center justify-between mb-1"><span class="text-xs text-slate-500 font-bold">إجمالي الأجهزة</span><i class="fa-solid fa-boxes-stacked text-slate-400 text-sm"></i></div>
+        <div class="text-2xl font-black text-slate-900" id="statTotal">0</div>
+      </div>
+      <div id="card_OPERATIONAL" onclick="filterByCard('OPERATIONAL')" class="bg-white p-3.5 rounded-2xl border border-emerald-100 cursor-pointer hover:border-emerald-500 transition">
+        <div class="flex items-center justify-between mb-1"><span class="text-xs text-emerald-700 font-bold">تعمل بكفاءة</span><i class="fa-solid fa-circle-check text-emerald-500 text-sm"></i></div>
+        <div class="text-2xl font-black text-emerald-600" id="statOperational">0</div>
+      </div>
+      <div id="card_MAINTENANCE" onclick="filterByCard('MAINTENANCE')" class="bg-white p-3.5 rounded-2xl border border-amber-100 cursor-pointer hover:border-amber-500 transition">
+        <div class="flex items-center justify-between mb-1"><span class="text-xs text-amber-700 font-bold">تحت الصيانة</span><i class="fa-solid fa-screwdriver-wrench text-amber-500 text-sm"></i></div>
+        <div class="text-2xl font-black text-amber-600" id="statMaintenance">0</div>
+      </div>
+      <div id="card_OVERDUE" onclick="filterByCard('OVERDUE')" class="bg-red-50 p-3.5 rounded-2xl border border-red-200 cursor-pointer hover:border-red-500 transition">
+        <div class="flex items-center justify-between mb-1"><span class="text-xs text-red-700 font-bold">متأخر عن الفحص</span><i class="fa-solid fa-triangle-exclamation text-red-500 text-sm animate-pulse"></i></div>
+        <div class="text-2xl font-black text-red-600" id="statOverdue">0</div>
+      </div>
+      <div id="card_UPCOMING" onclick="filterByCard('UPCOMING')" class="bg-amber-50 p-3.5 rounded-2xl border border-amber-200 cursor-pointer hover:border-amber-500 transition">
+        <div class="flex items-center justify-between mb-1"><span class="text-xs text-amber-800 font-bold">فحص قريباً</span><i class="fa-solid fa-clock-rotate-left text-amber-500 text-sm"></i></div>
+        <div class="text-2xl font-black text-amber-700" id="statUpcoming">0</div>
+      </div>
+      <div id="card_OUT" onclick="filterByCard('OUT')" class="bg-white p-3.5 rounded-2xl border border-slate-200 cursor-pointer hover:border-slate-500 transition">
+        <div class="flex items-center justify-between mb-1"><span class="text-xs text-slate-600 font-bold">خارج الخدمة</span><i class="fa-solid fa-ban text-slate-400 text-sm"></i></div>
+        <div class="text-2xl font-black text-slate-700" id="statOut">0</div>
+      </div>
+      <div id="card_DUPLICATES" onclick="filterByCard('DUPLICATES')" class="bg-rose-50 p-3.5 rounded-2xl border border-rose-200 cursor-pointer hover:border-rose-500 transition">
+        <div class="flex items-center justify-between mb-1"><span class="text-xs text-rose-700 font-bold">سيريال مكرر</span><i class="fa-solid fa-clone text-rose-500 text-sm"></i></div>
+        <div class="text-2xl font-black text-rose-600" id="statDuplicates">0</div>
+      </div>
+    </div>
+
+    <div class="bg-white p-4 rounded-2xl border border-slate-200 flex flex-wrap gap-3 items-center justify-between">
+      <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+        <div class="relative flex-1 min-w-[200px]">
+          <i class="fa-solid fa-magnifying-glass absolute right-3 top-3 text-slate-400 text-sm"></i>
+          <input type="text" id="searchInput" oninput="onFilterChange()" placeholder="بحث: اسم الجهاز، الشركة، S/N، رقم الأصل..." class="w-full pr-9 pl-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-vacsera-red">
+        </div>
+        <select id="labFilter" onchange="onFilterChange()" class="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-vacsera-red">
+          <option value="ALL">جميع المعامل (All Labs)</option>
+          <option value="AFP">معمل 1 (AFP)</option>
+          <option value="ENV">معمل 2 (ENV)</option>
+          <option value="PCR">معمل 3 (PCR)</option>
+          <option value="C.C">معمل 4 (C.C)</option>
+          <option value="SEQ">معمل 5 (SEQ)</option>
+          <option value="CORRIDOR">الممر الرئيسي (Main Corridor)</option>
+        </select>
+        <select id="statusFilter" onchange="onFilterChange()" class="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-vacsera-red">
+          <option value="ALL">جميع الحالات</option>
+          <option value="سليم">يعمل بكفاءة</option>
+          <option value="صيانة">تحت الصيانة</option>
+          <option value="خارج الخدمة">خارج الخدمة</option>
+        </select>
+        <label class="flex items-center gap-2 text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-xl cursor-pointer">
+          <input type="checkbox" id="overdueOnly" onchange="onFilterChange()" class="rounded text-vacsera-red focus:ring-0">
+          <span>المتأخرة عن موعد الفحص فقط</span>
+        </label>
+      </div>
+      <div class="text-xs text-slate-500 font-bold">عرض <span id="displayedCount" class="text-vacsera-red font-black">0</span> جهاز</div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-right text-xs sm:text-sm">
+          <thead class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 select-none">
+            <tr>
+              <th class="py-3.5 px-3 text-center w-10"><input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" class="rounded text-vacsera-red focus:ring-0 cursor-pointer"></th>
+              <th class="py-3.5 px-4">اسم الجهاز</th>
+              <th class="py-3.5 px-4">الشركة المصنعة</th>
+              <th class="py-3.5 px-4">الرقم التسلسلي (S/N)</th>
+              <th class="py-3.5 px-4">المعمل</th>
+              <th class="py-3.5 px-4">آخر فحص</th>
+              <th class="py-3.5 px-4">الفحص القادم</th>
+              <th class="py-3.5 px-4 text-center">المرفقات</th>
+              <th class="py-3.5 px-4 text-center">الحالة</th>
+              <th class="py-3.5 px-4 text-center">الإجراءات</th>
+            </tr>
+          </thead>
+          <tbody id="devicesTableBody" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+      <div id="emptyState" class="hidden p-12 text-center text-slate-400">
+        <i class="fa-solid fa-filter-circle-xmark text-4xl mb-3 text-slate-300"></i>
+        <p class="font-bold text-slate-600 mb-2">لا توجد أجهزة مطابقة للفلتر المختار حالياً</p>
+        <button onclick="resetAllFilters()" class="text-xs font-bold text-vacsera-red bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-xl transition">إلغاء الفلاتر وعرض جميع الأجهزة</button>
+      </div>
+    </div>
+    </div><!-- /devicesView -->
+
+    <!-- ===== Dostmann measuring instruments (separate registry) ===== -->
+    <div id="instrumentsView" class="hidden space-y-6">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200"><div class="flex items-center justify-between mb-1"><span class="text-xs text-slate-500 font-bold">إجمالي أجهزة القياس</span><i class="fa-solid fa-temperature-half text-slate-400 text-sm"></i></div><div class="text-2xl font-black text-slate-900" id="instStatTotal">0</div></div>
+        <div class="bg-white p-3.5 rounded-2xl border border-emerald-100"><div class="flex items-center justify-between mb-1"><span class="text-xs text-emerald-700 font-bold">تعمل بكفاءة</span><i class="fa-solid fa-circle-check text-emerald-500 text-sm"></i></div><div class="text-2xl font-black text-emerald-600" id="instStatOk">0</div></div>
+        <div class="bg-amber-50 p-3.5 rounded-2xl border border-amber-200"><div class="flex items-center justify-between mb-1"><span class="text-xs text-amber-800 font-bold">معايرة قريباً</span><i class="fa-solid fa-clock-rotate-left text-amber-500 text-sm"></i></div><div class="text-2xl font-black text-amber-700" id="instStatSoon">0</div></div>
+        <div class="bg-red-50 p-3.5 rounded-2xl border border-red-200"><div class="flex items-center justify-between mb-1"><span class="text-xs text-red-700 font-bold">متأخر عن المعايرة</span><i class="fa-solid fa-triangle-exclamation text-red-500 text-sm"></i></div><div class="text-2xl font-black text-red-600" id="instStatOver">0</div></div>
+      </div>
+
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 flex flex-wrap gap-3 items-center justify-between">
+        <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[260px]">
+          <div class="relative flex-1 min-w-[200px]">
+            <i class="fa-solid fa-magnifying-glass absolute right-3 top-3 text-slate-400 text-sm"></i>
+            <input type="text" id="instSearch" oninput="renderInstruments()" placeholder="بحث: الموديل، الشركة، S/N، مركّب على..." class="w-full pr-9 pl-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-vacsera-red">
+          </div>
+          <select id="instStatusFilter" onchange="renderInstruments()" class="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-vacsera-red">
+            <option value="ALL">جميع الحالات</option>
+            <option value="سليم">يعمل بكفاءة</option>
+            <option value="صيانة">تحت الصيانة</option>
+            <option value="خارج الخدمة">خارج الخدمة</option>
+            <option value="OVERDUE">متأخر عن المعايرة</option>
+          </select>
+        </div>
+        <button onclick="openInstModal()" class="bg-vacsera-red hover:bg-vacsera-redDark text-white text-sm font-bold py-2 px-4 rounded-xl flex items-center gap-2 shadow-sm transition">
+          <i class="fa-solid fa-circle-plus"></i><span id="instAddBtnText">إضافة جهاز قياس</span>
+        </button>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-right text-xs sm:text-sm">
+            <thead class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200 select-none">
+              <tr>
+                <th class="py-3.5 px-3 text-center w-12">#</th>
+                <th class="py-3.5 px-4">الجهاز / الوصف<div class="text-[10px] font-normal text-slate-400">Eq. Description</div></th>
+                <th class="py-3.5 px-4">الشركة المصنعة / الموديل<div class="text-[10px] font-normal text-slate-400">Manufacturer (Model/Type/PN)</div></th>
+                <th class="py-3.5 px-4">الرقم التسلسلي / الكود<div class="text-[10px] font-normal text-slate-400">Eq. Serial # / Code #</div></th>
+                <th id="instColRange" class="py-3.5 px-4">المدى والدقة<div class="text-[10px] font-normal text-slate-400">Measurement Range / Accuracy</div></th>
+                <th id="instColTol" class="py-3.5 px-4">القياس المطلوب / السماح<div class="text-[10px] font-normal text-slate-400">Measurement Required / Tolerance</div></th>
+                <th class="py-3.5 px-4">معايير المعايرة<div class="text-[10px] font-normal text-slate-400">Parameters</div></th>
+                <th class="py-3.5 px-4">فترة المعايرة<div class="text-[10px] font-normal text-slate-400">Interval</div></th>
+                <th class="py-3.5 px-4">ملاحظات<div class="text-[10px] font-normal text-slate-400">Notes</div></th>
+                <th class="py-3.5 px-4 text-center">الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="instTableBody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+        <div id="instEmpty" class="hidden p-12 text-center text-slate-400">
+          <i class="fa-solid fa-temperature-half text-4xl mb-3 text-slate-300"></i>
+          <p id="instEmptyTitle" class="font-bold text-slate-600 mb-2">لا توجد أجهزة قياس مسجلة</p>
+          <button onclick="openInstModal()" class="text-xs font-bold text-vacsera-red bg-red-50 hover:bg-red-100 border border-red-200 px-3 py-1.5 rounded-xl transition"><span id="instEmptyBtnText">+ إضافة أول جهاز قياس</span></button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Bulk toolbar (click-based menus: works on mobile) -->
+  <div id="bulkActionsToolbar" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 hidden bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex flex-wrap items-center justify-center gap-3 border border-slate-700 max-w-[96vw] no-print">
+    <div class="flex items-center gap-2 text-xs font-bold">
+      <span class="w-2.5 h-2.5 rounded-full bg-vacsera-red"></span>
+      <span>محدد <span id="bulkSelectedCount" class="text-amber-400 font-black">0</span> أجهزة</span>
+    </div>
+    <div class="h-4 w-px bg-slate-700"></div>
+
+    <div class="relative bulk-menu-wrap">
+      <button onclick="toggleBulkMenu('bulkLabMenu')" class="text-xs font-bold bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition">
+        <i class="fa-solid fa-location-dot text-indigo-400"></i><span>نقل لمكان</span><i class="fa-solid fa-chevron-up text-[10px]"></i>
+      </button>
+      <div id="bulkLabMenu" class="absolute bottom-full mb-1 right-0 hidden bg-white text-slate-800 rounded-xl shadow-xl border border-slate-200 py-1 w-44 text-xs font-bold z-50">
+        <div onclick="bulkApply('lab','AFP')" class="px-3 py-2 hover:bg-slate-100 cursor-pointer">معمل 1 (AFP)</div>
+        <div onclick="bulkApply('lab','ENV')" class="px-3 py-2 hover:bg-slate-100 cursor-pointer">معمل 2 (ENV)</div>
+        <div onclick="bulkApply('lab','PCR')" class="px-3 py-2 hover:bg-slate-100 cursor-pointer">معمل 3 (PCR)</div>
+        <div onclick="bulkApply('lab','C.C')" class="px-3 py-2 hover:bg-slate-100 cursor-pointer">معمل 4 (C.C)</div>
+        <div onclick="bulkApply('lab','SEQ')" class="px-3 py-2 hover:bg-slate-100 cursor-pointer">معمل 5 (SEQ)</div>
+        <div onclick="bulkApply('lab','CORRIDOR')" class="px-3 py-2 hover:bg-slate-100 cursor-pointer">الممر الرئيسي</div>
+      </div>
+    </div>
+
+    <div class="relative bulk-menu-wrap">
+      <button onclick="toggleBulkMenu('bulkStatusMenu')" class="text-xs font-bold bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition">
+        <i class="fa-solid fa-sliders text-emerald-400"></i><span>تغيير الحالة</span><i class="fa-solid fa-chevron-up text-[10px]"></i>
+      </button>
+      <div id="bulkStatusMenu" class="absolute bottom-full mb-1 right-0 hidden bg-white text-slate-800 rounded-xl shadow-xl border border-slate-200 py-1 w-36 text-xs font-bold z-50">
+        <div onclick="bulkApply('status','سليم')" class="px-3 py-2 hover:bg-slate-100 cursor-pointer text-emerald-600">يعمل بكفاءة</div>
+        <div onclick="bulkApply('status','صيانة')" class="px-3 py-2 hover:bg-slate-100 cursor-pointer text-amber-600">تحت الصيانة</div>
+        <div onclick="bulkApply('status','خارج الخدمة')" class="px-3 py-2 hover:bg-slate-100 cursor-pointer text-slate-600">خارج الخدمة</div>
+      </div>
+    </div>
+
+    <button onclick="printLabels([...selectedDeviceIds])" class="text-xs font-bold bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition">
+      <i class="fa-solid fa-tags text-sky-400"></i><span>طباعة ملصقات QR</span>
+    </button>
+    <button onclick="bulkApply('delete')" class="text-xs font-bold bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition">
+      <i class="fa-solid fa-trash-can"></i><span>حذف</span>
+    </button>
+    <div class="h-4 w-px bg-slate-700"></div>
+    <button onclick="clearBulkSelection()" class="text-slate-400 hover:text-white text-xs" title="إلغاء التحديد"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+
+  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 no-print">
+    <p>الشركة المصرية لإنتاج الأمصال واللقاحات والأدوية (VACSERA) - قطاع الشؤون الفنية والرقابة المعملية &copy; 2026</p>
+  </footer>
+
+  <!-- Printable labels sheet -->
+  <div id="labelsSheet"></div>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- Alerts -->
+  <div id="alertsModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 no-print">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeM('alertsModal')"></div>
+    <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[90vh] flex flex-col z-10">
+      <div class="flex items-center justify-between border-b pb-3 mb-3">
+        <h3 class="text-base font-black text-slate-800"><i class="fa-solid fa-bell text-amber-500 ml-1"></i> مركز التنبيهات</h3>
+        <button onclick="closeM('alertsModal')" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 mb-3 text-xs font-bold">
+        <label class="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+          التنبيه قبل الموعد بـ
+          <input type="number" id="leadDaysInput" min="1" max="90" class="w-14 border border-slate-300 rounded px-1 py-0.5 text-center">
+          يوم
+        </label>
+        <button onclick="saveLeadDays()" class="bg-slate-800 text-white px-3 py-1.5 rounded-xl">حفظ</button>
+        <button onclick="enableNotifications()" class="bg-sky-50 text-sky-700 border border-sky-200 px-3 py-1.5 rounded-xl"><i class="fa-solid fa-bell ml-1"></i>تفعيل إشعارات المتصفح</button>
+      </div>
+      <div id="alertsBody" class="overflow-y-auto flex-1 space-y-3"></div>
+      <div class="pt-3 border-t mt-3 flex flex-wrap items-center gap-2 text-xs font-bold">
+        <button onclick="sendAlert('wa', null)" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl"><i class="fa-brands fa-whatsapp ml-1"></i>إرسال الكل واتساب</button>
+        <button onclick="sendAlert('mail', null)" class="bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-xl"><i class="fa-solid fa-envelope ml-1"></i>إرسال الكل بالإيميل</button>
+        <button onclick="sendAlert('copy', null)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl"><i class="fa-solid fa-copy ml-1"></i>نسخ النص</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Calendar -->
+  <div id="calendarModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 no-print">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeM('calendarModal')"></div>
+    <div class="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl relative max-h-[92vh] overflow-y-auto z-10">
+      <div class="flex items-center justify-between border-b pb-3 mb-3">
+        <h3 class="text-base font-black text-slate-800"><i class="fa-solid fa-calendar-days text-sky-600 ml-1"></i> تقويم الاستحقاقات</h3>
+        <button onclick="closeM('calendarModal')" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="flex items-center justify-between mb-3">
+        <button onclick="calNav(-1)" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm font-bold"><i class="fa-solid fa-chevron-right"></i></button>
+        <div id="calTitle" class="font-black text-slate-800"></div>
+        <button onclick="calNav(1)" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm font-bold"><i class="fa-solid fa-chevron-left"></i></button>
+      </div>
+      <div class="grid grid-cols-7 gap-1 text-center text-[11px] font-black text-slate-500 mb-1">
+        <div>السبت</div><div>الأحد</div><div>الاثنين</div><div>الثلاثاء</div><div>الأربعاء</div><div>الخميس</div><div>الجمعة</div>
+      </div>
+      <div id="calGrid" class="grid grid-cols-7 gap-1"></div>
+      <div class="flex flex-wrap gap-3 text-[11px] font-bold mt-3">
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-red-500"></span>فحص متأخر</span>
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-amber-500"></span>فحص قادم</span>
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-purple-500"></span>انتهاء شهادة</span>
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-sky-500"></span>قطعة غيار</span>
+      </div>
+      <div id="calDetail" class="mt-3 space-y-2"></div>
+    </div>
+  </div>
+
+  <!-- Analytics -->
+  <div id="analyticsModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 no-print">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeM('analyticsModal')"></div>
+    <div class="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl relative max-h-[92vh] overflow-y-auto z-10">
+      <div class="flex items-center justify-between border-b pb-3 mb-4">
+        <h3 class="text-base font-black text-slate-800"><i class="fa-solid fa-chart-column text-purple-600 ml-1"></i> لوحة التحليلات</h3>
+        <button onclick="closeM('analyticsModal')" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="analyticsBody" class="space-y-5"></div>
+    </div>
+  </div>
+
+  <!-- Audit log -->
+  <div id="auditModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 no-print">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeM('auditModal')"></div>
+    <div class="bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl relative max-h-[92vh] flex flex-col z-10">
+      <div class="flex items-center justify-between border-b pb-3 mb-3">
+        <div>
+          <h3 class="text-base font-black text-slate-800"><i class="fa-solid fa-shield-halved text-slate-600 ml-1"></i> سجل التدقيق (Audit Trail)</h3>
+          <p id="auditSubtitle" class="text-xs text-vacsera-red font-bold"></p>
+        </div>
+        <button onclick="closeM('auditModal')" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="flex flex-wrap gap-2 mb-3">
+        <input id="auditSearch" oninput="renderAudit()" placeholder="بحث: مستخدم، جهاز، S/N..." class="flex-1 min-w-[180px] p-2 text-sm border border-slate-300 rounded-xl">
+        <select id="auditAction" onchange="renderAudit()" class="p-2 text-sm border border-slate-300 rounded-xl font-bold">
+          <option value="ALL">كل الإجراءات</option>
+        </select>
+        <button onclick="loadAudit()" class="px-3 py-2 text-xs font-bold bg-slate-100 hover:bg-slate-200 rounded-xl"><i class="fa-solid fa-rotate ml-1"></i>تحديث</button>
+      </div>
+      <div class="overflow-y-auto flex-1 border border-slate-200 rounded-xl">
+        <table class="w-full text-right text-xs">
+          <thead class="bg-slate-50 text-slate-600 font-bold sticky top-0"><tr>
+            <th class="p-2">الوقت</th><th class="p-2">المستخدم</th><th class="p-2">الإجراء</th><th class="p-2">الجهاز</th><th class="p-2">التغييرات</th>
+          </tr></thead>
+          <tbody id="auditBody" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Device form -->
+  <div id="deviceModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 no-print">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeDeviceModal()"></div>
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto z-10">
+      <div class="flex items-center justify-between border-b pb-3 mb-4">
+        <h3 id="modalTitle" class="text-base sm:text-lg font-black text-slate-800">إضافة جهاز طبي جديد</h3>
+        <button onclick="closeDeviceModal()" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="deviceForm" onsubmit="saveDevice(event)" class="space-y-4">
+        <input type="hidden" id="editDeviceId">
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">اسم الجهاز والطراز <span class="text-red-500">*</span></label>
+          <input type="text" id="devName" required placeholder="مثال: Biosafety Cabinet Class II" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">الشركة المصنعة <span class="text-red-500">*</span></label>
+            <input type="text" id="devBrand" required placeholder="مثال: Thermo Fisher" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">الرقم التسلسلي S/N <span class="text-red-500">*</span></label>
+            <input type="text" id="devSN" required placeholder="مثال: SN-PCR-2024-09" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red font-mono">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">رقم الأصل / الجرد الداخلي</label>
+            <input type="text" id="devAssetNo" placeholder="مثال: VAC-POL-0142" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">المعمل / المكان <span class="text-red-500">*</span></label>
+            <select id="devLab" required class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red font-bold">
+              <option value="AFP">معمل 1 (AFP)</option>
+              <option value="ENV">معمل 2 (ENV)</option>
+              <option value="PCR">معمل 3 (PCR)</option>
+              <option value="C.C">معمل 4 (C.C)</option>
+              <option value="SEQ">معمل 5 (SEQ)</option>
+              <option value="CORRIDOR">الممر الرئيسي (Main Corridor)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">الحالة التشغيلية <span class="text-red-500">*</span></label>
+            <select id="devStatus" required class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+              <option value="سليم">يعمل بكفاءة</option>
+              <option value="صيانة">تحت الصيانة</option>
+              <option value="خارج الخدمة">خارج الخدمة</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">دورية الفحص الدوري</label>
+            <select id="devInterval" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red font-bold">
+              <option value="1">شهري (كل شهر)</option>
+              <option value="3">كل 3 شهور</option>
+              <option value="6" selected>كل 6 شهور (نصف سنوي)</option>
+              <option value="12">سنوي (كل سنة)</option>
+              <option value="CNN">C.N.N</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">تاريخ آخر فحص / صيانة <span class="text-red-500">*</span></label>
+            <input type="date" id="devLastDate" required class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">تاريخ انتهاء شهادة المعايرة</label>
+            <input type="date" id="devCertExpiry" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+          </div>
+        </div>
+
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+          <div class="text-xs font-bold text-slate-800 flex items-center gap-1.5 border-b pb-1.5">
+            <i class="fa-solid fa-sliders text-vacsera-red"></i><span>بيانات المعايرة والقياس (Calibration & Measurement Specs)</span>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">معايير المعايرة (Calibration Parameters)</label>
+            <input type="text" id="devCalibParams" placeholder="مثال: Temperature, Speed, CO2 %..." class="w-full p-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-vacsera-red">
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">المدى والدقة (Range / Accuracy)</label>
+              <input type="text" id="devRangeAccuracy" placeholder="0 to 100 °C / ±0.5 °C" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-vacsera-red font-mono">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">القياس المطلوب / السماح (Tolerance)</label>
+              <input type="text" id="devTolerance" placeholder="37 °C ± 1 °C" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl bg-white focus:ring-2 focus:ring-vacsera-red font-mono">
+            </div>
+          </div>
+        </div>
+
+        <!-- Spare parts -->
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+          <div class="text-xs font-bold text-slate-800 flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><i class="fa-solid fa-gears text-sky-600"></i><span>قطع الغيار والمستهلكات (فلاتر، لمبات...)</span></span>
+            <button type="button" onclick="addPartRow()" class="text-[11px] bg-sky-50 text-sky-700 border border-sky-200 px-2 py-1 rounded-lg">+ إضافة قطعة</button>
+          </div>
+          <div class="grid grid-cols-12 gap-2 text-[10px] font-bold text-slate-500 px-1"><span class="col-span-5">القطعة</span><span class="col-span-4">آخر تغيير</span><span class="col-span-2">كل (شهر)</span></div>
+          <div id="partsList" class="space-y-2"></div>
+        </div>
+
+        <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+          <div class="text-xs font-bold text-slate-800 flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><i class="fa-solid fa-paperclip text-blue-600"></i><span>مرفق شهادة المعايرة (PDF / صورة)</span></span>
+            <span id="devAttachmentPreviewBadge" class="hidden text-[10px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full font-bold"></span>
+          </div>
+          <input type="file" id="devAttachmentInput" accept="image/*,.pdf" class="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+          <p class="text-[10px] text-slate-400">يُرفع الملف إلى التخزين السحابي (حد أقصى 10 ميجا). الكتالوجات وSOP تُضاف من زر "المستندات".</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">ملاحظات الفحص والتشغيل</label>
+          <textarea id="devNotes" rows="2" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red resize-none"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-3 border-t">
+          <button type="button" onclick="closeDeviceModal()" class="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200">إلغاء</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-vacsera-red hover:bg-vacsera-redDark shadow-sm">حفظ الجهاز</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scanner -->
+  <div id="scannerModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 no-print">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeScannerModal()"></div>
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative z-10 flex flex-col items-center">
+      <div class="flex items-center justify-between w-full border-b pb-3 mb-4">
+        <div class="flex items-center gap-2"><i class="fa-solid fa-camera text-indigo-600"></i><h3 class="text-base font-black text-slate-800">مسح باركود الجهاز بالكاميرا</h3></div>
+        <button onclick="closeScannerModal()" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="qrReaderContainer" class="w-full bg-black rounded-xl overflow-hidden min-h-[260px] flex items-center justify-center text-white text-xs">
+        <div id="qr-reader" class="w-full"></div>
+      </div>
+      <p class="text-xs text-slate-500 mt-3 text-center">وجّه الكاميرا نحو كود الـ QR الملصق على الجهاز لفتح سجله مباشرة.</p>
+      <div class="w-full flex justify-end pt-3 border-t mt-4">
+        <button onclick="closeScannerModal()" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inspection -->
+  <div id="inspectModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 no-print">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeInspectModal()"></div>
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative z-10 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b pb-3 mb-4">
+        <div>
+          <h3 class="text-base font-black text-slate-800">تسجيل كشف / صيانة دورية</h3>
+          <p id="inspectDeviceName" class="text-xs text-vacsera-red font-bold"></p>
+        </div>
+        <button onclick="closeInspectModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="inspectForm" onsubmit="saveInspection(event)" class="space-y-3">
+        <input type="hidden" id="inspectDeviceId">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">تاريخ الفحص الجديد</label>
+          <input type="date" id="inspDate" required class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">نوع الإجراء</label>
+          <select id="inspType" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red font-medium">
+            <option value="صيانة دورية وقائية">صيانة دورية وقائية</option>
+            <option value="معايرة دقيقة (Calibration)">معايرة دقيقة (Calibration)</option>
+            <option value="إصلاح عطل وتغيير قطع غيار">إصلاح عطل وتغيير قطع غيار</option>
+            <option value="فحص جودة روتيني">فحص جودة روتيني</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">اسم المهندس / الفاحص المسؤول</label>
+          <input type="text" id="inspInspector" required placeholder="اسم المهندس أو الفني" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">حالة الجهاز بعد الفحص</label>
+            <select id="inspStatus" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red font-medium">
+              <option value="سليم">يعمل بكفاءة</option>
+              <option value="صيانة">يحتاج متابعة / تحت الصيانة</option>
+              <option value="خارج الخدمة">خارج الخدمة</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">انتهاء الشهادة الجديدة (اختياري)</label>
+            <input type="date" id="inspCertExpiry" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">إرفاق تقرير الفحص أو شهادة المعايرة</label>
+          <input type="file" id="inspAttachmentInput" accept="image/*,.pdf" class="w-full text-xs text-slate-600 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">تقرير الفحص والملاحظات</label>
+          <textarea id="inspNotes" rows="2" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red resize-none"></textarea>
+        </div>
+        <div class="flex justify-end gap-2 pt-3 border-t">
+          <button type="button" onclick="closeInspectModal()" class="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200">إلغاء</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm">تأكيد وحفظ الكشف</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div id="historyModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 no-print">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeHistoryModal()"></div>
+    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl relative max-h-[88vh] flex flex-col z-10">
+      <div class="flex items-center justify-between border-b pb-3 mb-3">
+        <div>
+          <h3 class="text-base font-black text-slate-800">ملف الجهاز وسجل الصيانة</h3>
+          <p id="historyDeviceTitle" class="text-xs text-vacsera-red font-bold"></p>
+        </div>
+        <button onclick="closeHistoryModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="flex flex-wrap gap-2 mb-3">
+        <button onclick="histQuickInspect()" class="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700"><i class="fa-solid fa-stethoscope ml-1"></i>تسجيل كشف سريع</button>
+        <button onclick="histOpenDocs()" class="px-3 py-1.5 rounded-xl text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200"><i class="fa-solid fa-folder-open ml-1"></i>المستندات</button>
+        <button onclick="histOpenAudit()" class="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200"><i class="fa-solid fa-shield-halved ml-1"></i>سجل التعديلات</button>
+      </div>
+      <div id="historyDeviceSpecsBox" class="bg-slate-50 p-3 rounded-xl border border-slate-200 mb-3 text-xs space-y-1"></div>
+      <div class="overflow-y-auto flex-1 pr-1 space-y-3" id="historyTimeline"></div>
+      <div class="pt-3 border-t mt-4 flex items-center justify-between">
+        <button onclick="openQRModalFromHistory()" class="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 flex items-center gap-1.5">
+          <i class="fa-solid fa-qrcode"></i><span>عرض باركود الجهاز</span>
+        </button>
+        <button onclick="closeHistoryModal()" class="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Documents -->
+  <div id="docsModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 no-print">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeM('docsModal')"></div>
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] flex flex-col z-10">
+      <div class="flex items-center justify-between border-b pb-3 mb-3">
+        <div>
+          <h3 class="text-base font-black text-slate-800"><i class="fa-solid fa-folder-open text-blue-600 ml-1"></i> مستندات الجهاز</h3>
+          <p id="docsDeviceTitle" class="text-xs text-vacsera-red font-bold"></p>
+        </div>
+        <button onclick="closeM('docsModal')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="docsList" class="overflow-y-auto flex-1 space-y-2 mb-3"></div>
+      <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+        <div class="grid grid-cols-3 gap-2">
+          <input id="docTitle" placeholder="عنوان المستند" class="col-span-2 p-2 text-sm border border-slate-300 rounded-xl">
+          <select id="docCategory" class="p-2 text-sm border border-slate-300 rounded-xl font-bold">
+            <option>كتالوج</option><option>SOP</option><option>إجراء تشغيل</option><option>شهادة</option><option>أخرى</option>
+          </select>
+        </div>
+        <input type="file" id="docFile" class="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 cursor-pointer">
+        <button id="docUploadBtn" onclick="uploadDoc()" class="w-full py-2 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-700">رفع المستند</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Instrument form (matching exact Excel columns only) -->
+  <div id="instModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 no-print">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeM('instModal')"></div>
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto z-10">
+      <div class="flex items-center justify-between border-b pb-3 mb-4">
+        <h3 id="instModalTitle" class="text-base sm:text-lg font-black text-slate-800">إضافة جهاز قياس</h3>
+        <button onclick="closeM('instModal')" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="instForm" onsubmit="saveInstrument(event)" class="space-y-4">
+        <input type="hidden" id="instId">
+        <input type="hidden" id="instKind" value="DOSTMANN">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">الجهاز / الوصف (Eq. Description) <span class="text-red-500">*</span></label>
+          <input type="text" id="instName" required placeholder="مثال: Indoor-Out door Thermometer" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">الشركة المصنعة / الموديل (Manufacturer) <span class="text-red-500">*</span></label>
+            <input type="text" id="instBrand" required placeholder="TFA Dostmann GmbH(30.1024)" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">الرقم التسلسلي / الكود (Eq. Serial # / Code #) <span class="text-red-500">*</span></label>
+            <input type="text" id="instSN" required placeholder="مثال: 1810-1255-05/T" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red font-mono">
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label id="instRangeLabel" class="block text-xs font-bold text-slate-700 mb-1">المدى والدقة (Measurement Range / Accuracy) <span class="text-red-500">*</span></label>
+            <textarea id="instRange" rows="2" required placeholder="-50 : +70 C ± 2 C&#10;-10 : +50 C ± 2 C" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red font-mono resize-none"></textarea>
+          </div>
+          <div>
+            <label id="instTolLabel" class="block text-xs font-bold text-slate-700 mb-1">القياس المطلوب / السماح (Measurement Required / Tolerance)</label>
+            <textarea id="instTolerance" rows="2" placeholder="20,30,40 C ± 2 C&#10;+20 C ± 2 C" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red font-mono resize-none"></textarea>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">معايير المعايرة (Parameters)</label>
+            <input type="text" id="instCalibParams" placeholder="مثال: Temperature" value="Temperature" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">فترة المعايرة (Interval)</label>
+            <select id="instInterval" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red font-bold">
+              <option value="1">Every Month (شهري)</option>
+              <option value="3">Every 3 Months (كل 3 شهور)</option>
+              <option value="6">Every 6 Months (نصف سنوي)</option>
+              <option value="12" selected>Every Year (سنوي)</option>
+              <option value="24">Every 2 Years (كل سنتين)</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">ملاحظات (Notes)</label>
+          <textarea id="instNotes" rows="2" placeholder="ملاحظات إضافية..." class="w-full p-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-vacsera-red resize-none"></textarea>
+        </div>
+        <div class="flex justify-end gap-2 pt-3 border-t">
+          <button type="button" onclick="closeM('instModal')" class="px-4 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200">إلغاء</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-vacsera-red hover:bg-vacsera-redDark shadow-sm">حفظ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- QR tag -->
+  <div id="qrModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 no-print">
+    <div class="fixed inset-0 modal-backdrop" onclick="closeQRModal()"></div>
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl relative z-10">
+      <div class="flex items-center justify-between border-b pb-3 mb-4 no-print">
+        <h3 class="text-base font-black text-slate-800">بطاقة تعريف الجهاز (Asset Tag)</h3>
+        <button onclick="closeQRModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="printModalContent" class="border-2 border-black p-4 rounded-xl bg-white text-center">
+        <div class="flex items-center justify-between border-b-2 border-black pb-2 mb-2">
+          <div class="text-right">
+            <span class="text-[10px] font-black uppercase text-red-600 tracking-wider">VACSERA POLIO LABS</span>
+            <div id="qrLabName" class="text-xs font-black text-black"></div>
+          </div>
+          <div class="text-[10px] font-bold text-slate-600">MEDICAL ASSET</div>
+        </div>
+        <div id="qrContainer" class="flex justify-center my-3"></div>
+        <div class="text-right space-y-1">
+          <div class="text-xs font-black text-slate-900" id="qrDevName"></div>
+          <div class="text-[11px] font-mono font-bold text-slate-700">S/N: <span id="qrDevSN"></span></div>
+          <div class="text-[11px] font-mono font-bold text-slate-700" id="qrAssetRow">Asset: <span id="qrDevAsset"></span></div>
+          <div class="text-[10px] text-slate-500">الشركة: <span id="qrDevBrand"></span></div>
+          <div class="text-[9px] text-slate-400 pt-1 text-center font-mono">امسح الكود لفتح ملف الجهاز الإلكتروني مباشرة</div>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 mt-4 pt-3 border-t no-print">
+        <button onclick="closeQRModal()" class="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">إغلاق</button>
+        <button onclick="printAssetTag()" class="px-4 py-2 text-xs font-bold text-white bg-vacsera-black hover:bg-black rounded-xl flex items-center gap-1 shadow-sm">
+          <i class="fa-solid fa-print"></i><span>طباعة البطاقة</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Official report -->
+  <div id="reportModal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+    <div class="fixed inset-0 modal-backdrop no-print" onclick="closeOfficialReportModal()"></div>
+    <div class="bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl relative max-h-[92vh] flex flex-col z-10">
+      <div class="flex items-center justify-between border-b pb-3 mb-4 no-print">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-file-invoice text-vacsera-red"></i>
+          <h3 class="text-base sm:text-lg font-black text-slate-800">معاينة التقرير الرسمي (A4)</h3>
+          <span id="reportScopeNote" class="text-[11px] text-slate-500 font-bold"></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="printOfficialReport()" class="px-4 py-2 text-xs font-bold text-white bg-vacsera-red hover:bg-vacsera-redDark rounded-xl flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-print"></i><span>طباعة التقرير</span>
+          </button>
+          <button onclick="closeOfficialReportModal()" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+      <div class="overflow-y-auto flex-1 p-2 bg-slate-50 border rounded-xl">
+        <div id="officialReportContainer" class="bg-white p-8 max-w-[210mm] mx-auto text-slate-900 text-xs shadow-sm border border-slate-200">
+          <div class="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-4">
+            <div class="text-right">
+              <div class="text-sm font-black text-slate-900">جمهورية مصر العربية</div>
+              <div class="text-xs font-bold text-slate-700">وزارة الصحة والسكان</div>
+              <div class="text-xs font-bold text-vacsera-red">الشركة المصرية لإنتاج الأمصال واللقاحات والأدوية (VACSERA)</div>
+              <div class="text-[11px] text-slate-600 font-medium">قطاع الشؤون الفنية والرقابة المعملية - وحدة Polio</div>
+            </div>
+            <div class="text-center">
+              <div class="font-black text-base text-slate-900 border-2 border-slate-900 px-3 py-1 rounded">تقرير حصر ومعايرة الأجهزة المعملية</div>
+              <div class="text-[10px] text-slate-500 mt-1 font-mono" id="reportGeneratedDate"></div>
+            </div>
+            <div class="w-32 h-12 flex items-center justify-center">
+              <svg viewBox="0 0 280 80" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="0,78 280,78 280,26 80,62 0,78" fill="#111827" />
+                <text x="5" y="66" font-family="'Cairo', sans-serif" font-weight="900" font-style="italic" font-size="74" fill="#D32828">VACSERA</text>
+              </svg>
+            </div>
+          </div>
+          <div class="grid grid-cols-4 gap-2 mb-4 text-center">
+            <div class="border border-slate-300 p-2 rounded"><span class="block text-[10px] text-slate-500">إجمالي الأجهزة بالتقرير</span><span class="text-sm font-black text-slate-900" id="repStatTotal">0</span></div>
+            <div class="border border-slate-300 p-2 rounded bg-emerald-50"><span class="block text-[10px] text-emerald-800">تعمل بكفاءة</span><span class="text-sm font-black text-emerald-700" id="repStatOperational">0</span></div>
+            <div class="border border-slate-300 p-2 rounded bg-amber-50"><span class="block text-[10px] text-amber-800">تحت الصيانة</span><span class="text-sm font-black text-amber-700" id="repStatMaintenance">0</span></div>
+            <div class="border border-slate-300 p-2 rounded bg-slate-100"><span class="block text-[10px] text-slate-600">خارج الخدمة</span><span class="text-sm font-black text-slate-700" id="repStatOut">0</span></div>
+          </div>
+          <table class="w-full text-right border-collapse border border-slate-300 text-[10px] mb-8">
+            <thead>
+              <tr class="bg-slate-100 text-slate-800 border-b border-slate-300">
+                <th class="border border-slate-300 p-1.5 text-center w-8">م</th>
+                <th class="border border-slate-300 p-1.5">اسم الجهاز والطراز</th>
+                <th class="border border-slate-300 p-1.5">الشركة المصنعة</th>
+                <th class="border border-slate-300 p-1.5 font-mono">S/N</th>
+                <th class="border border-slate-300 p-1.5">المعمل / المكان</th>
+                <th class="border border-slate-300 p-1.5">مواصفات المعايرة / السماح</th>
+                <th class="border border-slate-300 p-1.5">آخر فحص</th>
+                <th class="border border-slate-300 p-1.5">الفحص القادم</th>
+                <th class="border border-slate-300 p-1.5 text-center">الحالة</th>
+              </tr>
+            </thead>
+            <tbody id="reportTableBody"></tbody>
+          </table>
+          <div class="grid grid-cols-3 gap-6 pt-6 border-t-2 border-slate-900 text-center text-xs font-bold">
+            <div><p class="mb-8">مهندس الأجهزة الطبية والصيانة</p><p class="text-slate-400 font-normal">..........................................</p></div>
+            <div><p class="mb-8">مسؤول توكيد وضبط الجودة (QA)</p><p class="text-slate-400 font-normal">..........................................</p></div>
+            <div><p class="mb-8">اعتماد مدير عام المعامل والرقابة</p><p class="text-slate-400 font-normal">..........................................</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============ Firebase ============
+    const firebaseConfig = {
+      apiKey: "AIzaSyAkQWZF1tV-ss8jVmSFq31yz_FSBHCyGdg",
+      authDomain: "vacsera-polio.firebaseapp.com",
+      projectId: "vacsera-polio",
+      storageBucket: "vacsera-polio.firebasestorage.app",
+      messagingSenderId: "133187376012",
+      appId: "1:133187376012:web:93632e11927ad8ee07bca9"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    let storage = null;
+    try { storage = firebase.storage(); } catch (e) { console.warn('Storage unavailable', e); }
+    const FV = firebase.firestore.FieldValue;
+    const COLLECTION_NAME = 'polio_devices';
+    const AUDIT_COLLECTION = 'polio_audit';
+
+    // ============ State ============
+    let devices = [];
+    let instruments = [];
+    let currentFilterCard = 'ALL';
+    let selectedDeviceIds = new Set();
+    let html5QrScanner = null;
+    let activeHistoryDeviceId = null;
+    let activeDocsDeviceId = null;
+    let editingExistingAttachment = null;
+    let firstSnapshotDone = false;
+    let auditCache = [];
+    let auditFilterDevice = null;
+    let calY = 0, calM = 0, calSel = null;
+    let LEAD_DAYS = parseInt(lsGet('vacsera_lead_days')) || 14;
+
+    const LABS = {
+      'PIPETTE_SC': { name: 'Pipette Single Channel', short: 'Pipette SC', cls: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+      'DOSTMANN': { name: 'أجهزة القياس (Dostmann)', short: 'أجهزة Dostmann', cls: 'bg-teal-50 text-teal-700 border-teal-200' },
+      'AFP': { name: 'معمل 1 (AFP)', short: 'معمل AFP', cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+      'ENV': { name: 'معمل 2 (ENV)', short: 'معمل ENV', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+      'PCR': { name: 'معمل 3 (PCR)', short: 'معمل PCR', cls: 'bg-purple-50 text-purple-700 border-purple-200' },
+      'C.C': { name: 'معمل 4 (C.C)', short: 'معمل C.C', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+      'SEQ': { name: 'معمل 5 (SEQ)', short: 'معمل SEQ', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+      'CORRIDOR': { name: 'الممر الرئيسي (Corridor)', short: 'الممر الرئيسي', cls: 'bg-slate-100 text-slate-700 border-slate-300' }
+    };
+    const FIELD_LABELS = {
+      name: 'الجهاز / الوصف (Eq. Description)', brand: 'الشركة المصنعة (Manufacturer)', sn: 'الرقم التسلسلي (Eq. Serial #)', assetNo: 'رقم الأصل', lab: 'المعمل', status: 'الحالة',
+      lastDate: 'آخر معايرة / فحص', intervalMonths: 'فترة المعايرة (Interval)', calibParams: 'معايير المعايرة (Parameters)', rangeAccuracy: 'المدى والدقة (Measurement Range / Accuracy)',
+      tolerance: 'القياس المطلوب / السماح (Measurement Required / Tolerance)', certExpiry: 'انتهاء الشهادة', notes: 'ملاحظات (Notes)', parts: 'قطع الغيار', instRange: 'المدى والدقة', instAccuracy: 'الدقة', assignedTo: 'مركّب على / المكان', category: 'النوع'
+    };
+    const AUDIT_FIELDS = Object.keys(FIELD_LABELS);
+    const ACTION_LABELS = {
+      create: 'إضافة', update: 'تعديل', delete: 'حذف', inspection: 'تسجيل كشف', bulk_lab: 'نقل جماعي',
+      bulk_status: 'تغيير حالة جماعي', bulk_delete: 'حذف جماعي', import: 'استيراد', add_doc: 'إضافة مستند', remove_doc: 'حذف مستند'
+    };
+
+    // ============ Helpers ============
+    function lsGet(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }
+    function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
+    function esc(s) {
+      return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function labLabel(c) { return LABS[c] ? LABS[c].name : (c || 'عام'); }
+    function labShort(c) { return LABS[c] ? LABS[c].short : (c || 'عام'); }
+    function openM(id) { document.getElementById(id).classList.remove('hidden'); }
+    function closeM(id) { document.getElementById(id).classList.add('hidden'); }
+    function toast(msg, type) {
+      const box = document.getElementById('toastBox');
+      const el = document.createElement('div');
+      el.className = 'px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg text-white ' + (type === 'err' ? 'bg-red-600' : 'bg-slate-900');
+      el.textContent = msg;
+      box.appendChild(el);
+      setTimeout(() => el.remove(), type === 'err' ? 7000 : 3500);
+    }
+    function setBusy(form, busy, text) {
+      const btn = form.querySelector('button[type=submit]');
+      if (!btn) return;
+      if (busy) { btn.dataset.old = btn.textContent; btn.textContent = text || 'جارٍ الحفظ...'; btn.disabled = true; btn.classList.add('opacity-60'); }
+      else { btn.textContent = btn.dataset.old || btn.textContent; btn.disabled = false; btn.classList.remove('opacity-60'); }
+    }
+
+    // Dates (local-time safe)
+    function formatISODate(d) {
+      if (!d || isNaN(d.getTime())) return '';
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    function todayISO() { return formatISODate(new Date()); }
+    function parseSafeDate(v) {
+      if (v instanceof Date) return isNaN(v.getTime()) ? null : new Date(v.getFullYear(), v.getMonth(), v.getDate());
+      if (!v || typeof v !== 'string') return null;
+      const s = v.trim();
+      if (!s) return null;
+      const p = s.split(/[-/]/);
+      if (p.length === 3) {
+        let d = null;
+        if (p[0].length === 4) d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+        else if (p[2].length === 4) d = new Date(parseInt(p[2], 10), parseInt(p[1], 10) - 1, parseInt(p[0], 10));
+        if (d) return isNaN(d.getTime()) ? null : d;
+      }
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+    function addMonths(d, m) {
+      const day = d.getDate();
+      const r = new Date(d.getFullYear(), d.getMonth() + m, 1);
+      const last = new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate();
+      r.setDate(Math.min(day, last));
+      return r;
+    }
+    function daysUntil(date) {
+      const t = new Date(); t.setHours(0, 0, 0, 0);
+      const x = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      return Math.round((x - t) / 86400000);
+    }
+    function getNextDueDate(lastDateStr, intervalMonths) {
+      if (!lastDateStr || intervalMonths === 'CNN') return null;
+      const d = parseSafeDate(lastDateStr);
+      const m = parseInt(intervalMonths, 10);
+      if (!d || isNaN(m) || m <= 0) return null;
+      return addMonths(d, m);
+    }
+    function getDueStatus(device) {
+      if (device.intervalMonths === 'CNN') return { text: 'C.N.N', class: 'bg-sky-50 text-sky-700 border border-sky-200', isOverdue: false, isUpcoming: false, nextDateStr: 'C.N.N', diffDays: null };
+      const next = getNextDueDate(device.lastDate, device.intervalMonths);
+      if (!next) return { text: 'غير محدد', class: 'bg-slate-100 text-slate-700', isOverdue: false, isUpcoming: false, nextDateStr: '', diffDays: null };
+      const diff = daysUntil(next);
+      const nextDateStr = formatISODate(next);
+      if (diff < 0) return { text: `متأخر (${Math.abs(diff)} يوم)`, class: 'bg-red-100 text-red-700 border border-red-200', isOverdue: true, isUpcoming: false, nextDateStr, diffDays: diff };
+      if (diff <= LEAD_DAYS) return { text: diff === 0 ? 'مستحق اليوم' : `مستحق خلال ${diff} يوم`, class: 'bg-amber-100 text-amber-800 border border-amber-200', isOverdue: false, isUpcoming: true, nextDateStr, diffDays: diff };
+      return { text: 'سارٍ', class: 'bg-emerald-50 text-emerald-700', isOverdue: false, isUpcoming: false, nextDateStr, diffDays: diff };
+    }
+    function getPartDue(p) {
+      const d = parseSafeDate(p.lastChange);
+      const m = parseInt(p.intervalMonths, 10);
+      if (!d || isNaN(m) || m <= 0) return null;
+      const next = addMonths(d, m);
+      return { next, days: daysUntil(next) };
+    }
+    function normalizeStatus(st) {
+      if (!st || typeof st !== 'string') return 'سليم';
+      const s = st.trim();
+      if (s.includes('خارج') || s.includes('معطل') || s.toLowerCase().includes('out')) return 'خارج الخدمة';
+      if (s.includes('صيان') || s.toLowerCase().includes('maint')) return 'صيانة';
+      if (s.includes('كفاء') || s.includes('سليم') || s.includes('يعمل') || s.toLowerCase().includes('good')) return 'سليم';
+      return s;
+    }
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve({ name: file.name, size: file.size, type: file.type, data: r.result });
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+    }
+
+    // ============ User + Audit ============
+    function ensureUser(force) {
+      let u = lsGet('vacsera_user');
+      if (!u || force === true) {
+        const n = prompt('اكتب اسمك (يُسجَّل في سجل التدقيق مع كل تعديل):', u || '');
+        if (n && n.trim()) { u = n.trim(); lsSet('vacsera_user', u); }
+        else if (!u) return null;
+      }
+      updateUserChip();
+      return u;
+    }
+    function updateUserChip() {
+      const u = lsGet('vacsera_user');
+      const el = document.getElementById('userChip');
+      if (el) el.textContent = u || 'حدد اسمك';
+    }
+    function cut(v) { const s = String(v === undefined || v === null ? '' : v); return s.length > 200 ? s.slice(0, 200) + '…' : s; }
+    function partsToStr(parts) { return (parts || []).map(p => `${p.name} (${p.lastChange || '—'} / ${p.intervalMonths}ش)`).join('، '); }
+    function fieldVal(obj, k) { if (!obj) return ''; return k === 'parts' ? partsToStr(obj.parts) : (obj[k] === undefined || obj[k] === null ? '' : obj[k]); }
+    function diffObjects(before, after) {
+      const out = [];
+      AUDIT_FIELDS.forEach(k => {
+        const b = fieldVal(before, k), a = fieldVal(after, k);
+        if (String(b) !== String(a)) out.push({ f: k, b: cut(b), a: cut(a) });
+      });
+      return out;
+    }
+    function auditDoc(action, dev, changes, user, note) {
+      return {
+        ts: FV.serverTimestamp(), user, action,
+        deviceId: dev.id || '', deviceName: dev.name || '', sn: dev.sn || '',
+        changes: changes || [], note: note || ''
+      };
+    }
+    async function commitOps(ops) {
+      for (let i = 0; i < ops.length; i += 400) {
+        const b = db.batch();
+        ops.slice(i, i + 400).forEach(o => {
+          if (o.t === 'set') b.set(o.ref, o.data);
+          else if (o.t === 'update') b.update(o.ref, o.data);
+          else if (o.t === 'delete') b.delete(o.ref);
+        });
+        await b.commit();
+      }
+    }
+
+    // ============ Storage uploads ============
+    async function uploadFile(file, folder) {
+      if (file.size > 10 * 1024 * 1024) throw new Error('الملف أكبر من 10 ميجا');
+      if (storage) {
+        try {
+          const path = `polio/${folder}/${Date.now()}_${file.name.replace(/[^\w.\-]+/g, '_')}`;
+          const ref = storage.ref(path);
+          await ref.put(file);
+          const url = await ref.getDownloadURL();
+          return { name: file.name, size: file.size, type: file.type, url, path };
+        } catch (err) {
+          console.warn('Storage upload failed', err);
+          if (file.size > 600 * 1024) throw new Error('تعذر الرفع للتخزين السحابي. تأكد من تفعيل Firebase Storage وقواعده. (' + err.message + ')');
+        }
+      }
+      if (file.size > 600 * 1024) throw new Error('Firebase Storage غير متاح والملف كبير.');
+      return await fileToBase64(file);
+    }
+    async function viewAttachment(att) {
+      if (!att) return;
+      if (att.url) { window.open(att.url, '_blank', 'noopener'); return; }
+      if (att.data) {
+        try {
+          const blob = await (await fetch(att.data)).blob();
+          window.open(URL.createObjectURL(blob), '_blank');
+        } catch (_) { toast('تعذر فتح المرفق', 'err'); }
+      }
+    }
+    function latestAttachment(dev) {
+      const h = (dev.history || []).find(x => x.attachment);
+      return h ? h.attachment : (dev.attachment || null);
+    }
+    function viewDeviceAttachment(id) {
+      const dev = findAny(id);
+      const att = dev ? latestAttachment(dev) : null;
+      if (att) viewAttachment(att); else toast('لا يوجد مرفق مسجل لهذا الجهاز.', 'err');
+    }
+    function viewHistoryAttachment(idx) {
+      const dev = findAny(activeHistoryDeviceId);
+      if (dev && dev.history && dev.history[idx]) viewAttachment(dev.history[idx].attachment);
+    }
+
+    // ============ Bulk selection ============
+    function toggleSelectAll(master) {
+      document.querySelectorAll('.device-check').forEach(cb => {
+        cb.checked = master.checked;
+        if (master.checked) selectedDeviceIds.add(cb.value); else selectedDeviceIds.delete(cb.value);
+      });
+      updateBulkToolbarUI();
+    }
+    function toggleDeviceSelect(cb, id) {
+      if (cb.checked) selectedDeviceIds.add(id);
+      else { selectedDeviceIds.delete(id); const m = document.getElementById('selectAllCheckbox'); if (m) m.checked = false; }
+      updateBulkToolbarUI();
+    }
+    function updateBulkToolbarUI() {
+      const toolbar = document.getElementById('bulkActionsToolbar');
+      document.getElementById('bulkSelectedCount').innerText = selectedDeviceIds.size;
+      if (selectedDeviceIds.size > 0) toolbar.classList.remove('hidden');
+      else { toolbar.classList.add('hidden'); const m = document.getElementById('selectAllCheckbox'); if (m) m.checked = false; }
+    }
+    function clearBulkSelection() {
+      selectedDeviceIds.clear();
+      document.querySelectorAll('.device-check').forEach(cb => cb.checked = false);
+      updateBulkToolbarUI();
+    }
+    function toggleBulkMenu(id) {
+      ['bulkLabMenu', 'bulkStatusMenu'].forEach(m => { if (m !== id) document.getElementById(m).classList.add('hidden'); });
+      document.getElementById(id).classList.toggle('hidden');
+    }
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.bulk-menu-wrap')) ['bulkLabMenu', 'bulkStatusMenu'].forEach(m => { const el = document.getElementById(m); if (el) el.classList.add('hidden'); });
+    });
+
+    async function bulkApply(kind, value) {
+      ['bulkLabMenu', 'bulkStatusMenu'].forEach(m => document.getElementById(m).classList.add('hidden'));
+      if (selectedDeviceIds.size === 0) return;
+      const user = ensureUser(); if (!user) return;
+      const list = [...selectedDeviceIds].map(id => findAny(id)).filter(Boolean);
+      const n = list.length;
+      let msg = '';
+      if (kind === 'lab') msg = `نقل ${n} جهاز إلى "${labLabel(value)}"؟`;
+      else if (kind === 'status') msg = `تغيير حالة ${n} جهاز إلى "${value}"؟`;
+      else msg = `تحذير نهائي: حذف ${n} جهاز من المنظومة؟ لا يمكن التراجع (سيبقى أثر الحذف في سجل التدقيق).`;
+      if (!confirm(msg)) return;
+
+      const ops = [];
+      list.forEach(d => {
+        const ref = db.collection(COLLECTION_NAME).doc(d.id);
+        const aref = db.collection(AUDIT_COLLECTION).doc();
+        if (kind === 'lab') {
+          if (d.lab === value) return;
+          ops.push({ t: 'update', ref, data: { lab: value, transfers: FV.arrayUnion({ from: d.lab || '', to: value, date: todayISO(), by: user }) } });
+          ops.push({ t: 'set', ref: aref, data: auditDoc('bulk_lab', d, [{ f: 'lab', b: d.lab || '', a: value }], user) });
+        } else if (kind === 'status') {
+          if (normalizeStatus(d.status) === value) return;
+          ops.push({ t: 'update', ref, data: { status: value } });
+          ops.push({ t: 'set', ref: aref, data: auditDoc('bulk_status', d, [{ f: 'status', b: d.status || '', a: value }], user) });
+        } else {
+          ops.push({ t: 'delete', ref });
+          ops.push({ t: 'set', ref: aref, data: auditDoc('bulk_delete', d, diffObjects(d, {}), user) });
+        }
+      });
+      if (!ops.length) { toast('لا توجد تغييرات لتطبيقها'); return; }
+      try {
+        await commitOps(ops);
+        toast('تم تنفيذ العملية على ' + n + ' جهاز');
+        clearBulkSelection();
+      } catch (err) { toast('خطأ: ' + err.message, 'err'); }
+    }
+
+    // ============ Filters ============
+    function onFilterChange() { currentFilterCard = 'ALL'; updateCardStyles(); renderTable(); }
+    function updateCardStyles() {
+      ['ALL', 'OPERATIONAL', 'MAINTENANCE', 'OVERDUE', 'UPCOMING', 'OUT', 'DUPLICATES'].forEach(c => {
+        const el = document.getElementById('card_' + c);
+        if (!el) return;
+        const on = c === currentFilterCard;
+        el.classList.toggle('ring-2', on); el.classList.toggle('ring-vacsera-red', on); el.classList.toggle('scale-[1.02]', on);
+      });
+    }
+    function resetAllFilters() {
+      currentFilterCard = 'ALL';
+      document.getElementById('searchInput').value = '';
+      document.getElementById('labFilter').value = 'ALL';
+      document.getElementById('statusFilter').value = 'ALL';
+      document.getElementById('overdueOnly').checked = false;
+      updateCardStyles(); renderTable();
+    }
+    function filterByCard(t) {
+      currentFilterCard = t;
+      document.getElementById('overdueOnly').checked = (t === 'OVERDUE');
+      updateCardStyles(); renderTable();
+    }
+
+    // ============ Cloud sync ============
+    function initCloudSync() {
+      const badge = document.getElementById('cloudStatusBadge');
+      db.collection(COLLECTION_NAME).onSnapshot(snapshot => {
+        devices = []; instruments = [];
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data && (data.name || data.sn)) (KINDS[data.category] ? instruments : devices).push({ id: doc.id, ...data });
+        });
+        badge.className = 'bg-emerald-100 text-emerald-700 text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200';
+        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> متزامن سحابياً';
+        updateStats(); renderTable(); renderInstruments(); updateAlertBadge();
+        checkUrlForDirectDevice();
+        if (!firstSnapshotDone) { firstSnapshotDone = true; maybeNotifyOnLoad(); }
+      }, error => {
+        console.error('Firestore sync error:', error);
+        badge.className = 'bg-rose-100 text-rose-700 text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-rose-200';
+        badge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> غير متصل بالسحابة';
+      });
+      const logo = lsGet('vacsera_custom_logo');
+      if (logo) renderCustomLogo(logo);
+      updateUserChip();
+      if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+    function checkUrlForDirectDevice() {
+      const params = new URLSearchParams(window.location.search);
+      const t = params.get('dev');
+      if (t && devices.length > 0) {
+        const found = [...devices, ...instruments].find(d => d.id === t || d.sn === t);
+        if (found) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+          openHistoryModal(found.id);
+        }
+      }
+    }
+
+    function snCountsMap() {
+      const m = {};
+      devices.forEach(d => { const s = (d.sn || '').trim().toLowerCase(); if (s) m[s] = (m[s] || 0) + 1; });
+      return m;
+    }
+    function updateStats() {
+      document.getElementById('statTotal').innerText = devices.length;
+      document.getElementById('statOperational').innerText = devices.filter(d => normalizeStatus(d.status) === 'سليم').length;
+      document.getElementById('statMaintenance').innerText = devices.filter(d => normalizeStatus(d.status) === 'صيانة').length;
+      document.getElementById('statOut').innerText = devices.filter(d => normalizeStatus(d.status) === 'خارج الخدمة').length;
+      let o = 0, u = 0;
+      devices.forEach(d => { const s = getDueStatus(d); if (s.isOverdue) o++; if (s.isUpcoming) u++; });
+      document.getElementById('statOverdue').innerText = o;
+      document.getElementById('statUpcoming').innerText = u;
+      const sc = snCountsMap();
+      document.getElementById('statDuplicates').innerText = devices.filter(d => { const s = (d.sn || '').trim().toLowerCase(); return s && sc[s] > 1; }).length;
+    }
+
+    // ============ Table ============
+    function renderTable() {
+      const tbody = document.getElementById('devicesTableBody');
+      const search = document.getElementById('searchInput').value.trim().toLowerCase();
+      const lab = document.getElementById('labFilter').value;
+      const statusFilter = document.getElementById('statusFilter').value;
+      const overdueOnly = document.getElementById('overdueOnly').checked;
+      tbody.innerHTML = '';
+      const snCounts = snCountsMap();
+
+      const filtered = devices.filter(device => {
+        const hay = [device.name, device.brand, device.sn, device.assetNo].map(x => (x || '').toLowerCase());
+        const matchesSearch = !search || hay.some(h => h.includes(search));
+        const matchesLab = lab === 'ALL' || device.lab === lab;
+        const st = normalizeStatus(device.status);
+        const matchesStatus = statusFilter === 'ALL' || st === statusFilter;
+        const due = getDueStatus(device);
+        if (overdueOnly && !due.isOverdue) return false;
+        const sn = (device.sn || '').trim().toLowerCase();
+        let matchesCard = true;
+        if (currentFilterCard === 'OPERATIONAL') matchesCard = st === 'سليم';
+        else if (currentFilterCard === 'MAINTENANCE') matchesCard = st === 'صيانة';
+        else if (currentFilterCard === 'OUT') matchesCard = st === 'خارج الخدمة';
+        else if (currentFilterCard === 'OVERDUE') matchesCard = due.isOverdue;
+        else if (currentFilterCard === 'UPCOMING') matchesCard = due.isUpcoming;
+        else if (currentFilterCard === 'DUPLICATES') matchesCard = Boolean(sn && snCounts[sn] > 1);
+        return matchesSearch && matchesLab && matchesStatus && matchesCard;
+      });
+
+      document.getElementById('displayedCount').innerText = filtered.length;
+      document.getElementById('emptyState').classList.toggle('hidden', filtered.length !== 0);
+
+      filtered.forEach(device => {
+        const due = getDueStatus(device);
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+        const labCls = LABS[device.lab] ? LABS[device.lab].cls : 'bg-slate-50 text-slate-700 border-slate-200';
+        const labBadge = `<span class="${labCls} border px-2.5 py-0.5 rounded-full text-xs font-bold">${esc(labLabel(device.lab))}</span>`;
+        const rs = normalizeStatus(device.status);
+        let statusBadge;
+        if (rs === 'سليم') statusBadge = '<span class="inline-flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full font-bold text-xs"><i class="fa-solid fa-circle-check text-[10px]"></i> كفاءة</span>';
+        else if (rs === 'صيانة') statusBadge = '<span class="inline-flex items-center gap-1 text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full font-bold text-xs"><i class="fa-solid fa-screwdriver-wrench text-[10px]"></i> صيانة</span>';
+        else statusBadge = '<span class="inline-flex items-center gap-1 text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full font-bold text-xs"><i class="fa-solid fa-ban text-[10px]"></i> معطل</span>';
+
+        const calib = (device.calibParams || device.rangeAccuracy || device.tolerance) ? `
+          <div class="mt-1 flex flex-wrap gap-1 text-[10px] font-normal text-slate-500">
+            ${device.calibParams ? `<span class="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200"><i class="fa-solid fa-sliders text-slate-400 ml-1"></i>${esc(device.calibParams)}</span>` : ''}
+            ${device.rangeAccuracy ? `<span class="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 font-mono">Range: ${esc(device.rangeAccuracy)}</span>` : ''}
+            ${device.tolerance ? `<span class="bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded border border-sky-200 font-mono">Tol: ${esc(device.tolerance)}</span>` : ''}
+          </div>` : '';
+
+        let certBadge = '';
+        if (device.certExpiry) {
+          const cd = parseSafeDate(device.certExpiry);
+          if (cd) {
+            const n = daysUntil(cd);
+            const cc = n < 0 ? 'bg-red-50 text-red-700 border-red-200' : (n <= Math.max(30, LEAD_DAYS) ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-purple-50 text-purple-700 border-purple-200');
+            certBadge = `<span class="${cc} border px-1.5 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-certificate ml-1"></i>شهادة حتى ${esc(device.certExpiry)}${n < 0 ? ' (منتهية)' : ''}</span>`;
+          }
+        }
+        const assetTag = device.assetNo ? `<span class="bg-slate-800 text-white px-1.5 py-0.5 rounded text-[10px] font-mono font-bold">${esc(device.assetNo)}</span>` : '';
+        const hasPartsDue = (device.parts || []).some(p => { const pd = getPartDue(p); return pd && pd.days <= LEAD_DAYS; });
+        const partTag = hasPartsDue ? '<span class="bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-gears ml-1"></i>قطعة مستحقة</span>' : '';
+
+        const att = latestAttachment(device);
+        const docsCount = (device.docs || []).length;
+        const attHtml = `<div class="flex items-center justify-center gap-1">
+          ${att ? `<button onclick="viewDeviceAttachment('${esc(device.id)}')" title="عرض شهادة المعايرة / التقرير" class="text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-1 rounded-lg text-xs font-bold"><i class="fa-solid fa-paperclip"></i></button>` : ''}
+          <button onclick="openDocsModal('${esc(device.id)}')" title="مستندات الجهاز" class="text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-2 py-1 rounded-lg text-xs font-bold"><i class="fa-solid fa-folder-open"></i>${docsCount ? ' ' + docsCount : ''}</button>
+        </div>`;
+
+        const dup = device.sn && snCounts[device.sn.trim().toLowerCase()] > 1;
+        const id = esc(device.id);
+        tr.innerHTML = `
+          <td class="py-3.5 px-3 text-center"><input type="checkbox" class="device-check rounded text-vacsera-red focus:ring-0 cursor-pointer" value="${id}" ${selectedDeviceIds.has(device.id) ? 'checked' : ''} onchange="toggleDeviceSelect(this, '${id}')"></td>
+          <td class="py-3.5 px-4 font-bold text-slate-900">
+            <div>${esc(device.name)}</div>
+            <div class="flex flex-wrap gap-1 mt-1">${assetTag}${certBadge}${partTag}</div>
+            <div class="text-[11px] text-slate-400 font-normal sm:hidden font-mono">${esc(device.sn)}</div>
+            ${calib}
+          </td>
+          <td class="py-3.5 px-4 text-slate-700 font-bold">${esc(device.brand) || '—'}</td>
+          <td class="py-3.5 px-4 font-mono font-bold text-slate-700 text-xs">
+            <div class="flex items-center gap-1.5 flex-wrap"><span>${esc(device.sn) || '—'}</span>
+            ${dup ? '<span class="bg-rose-100 text-rose-700 border border-rose-300 text-[10px] px-1.5 py-0.5 rounded-md font-bold"><i class="fa-solid fa-triangle-exclamation text-[9px]"></i> مكرر</span>' : ''}</div>
+          </td>
+          <td class="py-3.5 px-4">${labBadge}</td>
+          <td class="py-3.5 px-4 text-slate-600 text-xs">${esc(device.lastDate) || '—'}</td>
+          <td class="py-3.5 px-4"><span class="text-xs px-2.5 py-1 rounded-lg font-bold ${due.class}">${esc(due.nextDateStr)} (${esc(due.text)})</span></td>
+          <td class="py-3.5 px-4 text-center">${attHtml}</td>
+          <td class="py-3.5 px-4 text-center">${statusBadge}</td>
+          <td class="py-3.5 px-4 text-center">
+            <div class="flex items-center justify-center gap-1">
+              <button onclick="openInspectModal('${id}')" title="تسجيل كشف" class="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg"><i class="fa-solid fa-stethoscope"></i></button>
+              <button onclick="openQRModal('${id}')" title="باركود" class="p-2 text-slate-700 hover:bg-slate-100 rounded-lg"><i class="fa-solid fa-qrcode"></i></button>
+              <button onclick="openHistoryModal('${id}')" title="سجل الجهاز" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><i class="fa-solid fa-clock-rotate-left"></i></button>
+              <button onclick="editDevice('${id}')" title="تعديل" class="p-2 text-slate-500 hover:bg-slate-100 rounded-lg"><i class="fa-solid fa-pen-to-square"></i></button>
+              <button onclick="deleteDevice('${id}')" title="حذف" class="p-2 text-rose-500 hover:bg-rose-50 rounded-lg"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+      updateBulkToolbarUI();
+    }
+
+    // ============ Device modal ============
+    const PART_INTERVALS = [1, 3, 6, 12, 24, 36];
+    function addPartRow(p) {
+      p = p || {};
+      const div = document.createElement('div');
+      div.className = 'part-row grid grid-cols-12 gap-2 items-center';
+      div.innerHTML = `
+        <input class="part-name col-span-5 p-2 text-xs border border-slate-300 rounded-lg bg-white" placeholder="مثال: فلتر HEPA" value="${esc(p.name)}">
+        <input type="date" class="part-date col-span-4 p-2 text-xs border border-slate-300 rounded-lg bg-white" value="${esc(p.lastChange)}">
+        <select class="part-interval col-span-2 p-2 text-xs border border-slate-300 rounded-lg bg-white">
+          ${PART_INTERVALS.map(m => `<option value="${m}" ${parseInt(p.intervalMonths, 10) === m || (!p.intervalMonths && m === 12) ? 'selected' : ''}>${m}</option>`).join('')}
+        </select>
+        <button type="button" class="col-span-1 text-rose-500 hover:text-rose-700" onclick="this.closest('.part-row').remove()"><i class="fa-solid fa-xmark"></i></button>`;
+      document.getElementById('partsList').appendChild(div);
+    }
+    function collectParts() {
+      const out = [];
+      document.querySelectorAll('#partsList .part-row').forEach(r => {
+        const name = r.querySelector('.part-name').value.trim();
+        if (!name) return;
+        out.push({ name, lastChange: r.querySelector('.part-date').value || '', intervalMonths: parseInt(r.querySelector('.part-interval').value, 10) || 12 });
+      });
+      return out;
+    }
+
+    function openDeviceModal(device) {
+      document.getElementById('deviceForm').reset();
+      document.getElementById('partsList').innerHTML = '';
+      editingExistingAttachment = null;
+      const badge = document.getElementById('devAttachmentPreviewBadge');
+      badge.classList.add('hidden');
+      if (device) {
+        document.getElementById('modalTitle').innerText = 'تعديل بيانات الجهاز';
+        document.getElementById('editDeviceId').value = device.id;
+        document.getElementById('devName').value = device.name || '';
+        document.getElementById('devBrand').value = device.brand || '';
+        document.getElementById('devSN').value = device.sn || '';
+        document.getElementById('devAssetNo').value = device.assetNo || '';
+        document.getElementById('devLab').value = device.lab || 'PCR';
+        document.getElementById('devStatus').value = normalizeStatus(device.status);
+        document.getElementById('devLastDate').value = device.lastDate || '';
+        document.getElementById('devCertExpiry').value = device.certExpiry || '';
+        document.getElementById('devInterval').value = String(device.intervalMonths || 6);
+        document.getElementById('devCalibParams').value = device.calibParams || '';
+        document.getElementById('devRangeAccuracy').value = device.rangeAccuracy || '';
+        document.getElementById('devTolerance').value = device.tolerance || '';
+        document.getElementById('devNotes').value = device.notes || '';
+        (device.parts || []).forEach(p => addPartRow(p));
+        if (device.attachment) {
+          editingExistingAttachment = device.attachment;
+          badge.classList.remove('hidden');
+          badge.innerText = 'مرفق: ' + (device.attachment.name || 'ملف محفوظ');
+        }
+      } else {
+        document.getElementById('modalTitle').innerText = 'إضافة جهاز طبي جديد';
+        document.getElementById('editDeviceId').value = '';
+        document.getElementById('devLastDate').value = todayISO();
+        document.getElementById('devInterval').value = '6';
+      }
+      openM('deviceModal');
+    }
+    function closeDeviceModal() { closeM('deviceModal'); }
+    function editDevice(id) { const d = devices.find(x => x.id === id); if (d) openDeviceModal(d); }
+
+    async function saveDevice(e) {
+      e.preventDefault();
+      const user = ensureUser(); if (!user) { toast('لازم تكتب اسمك الأول', 'err'); return; }
+      const form = document.getElementById('deviceForm');
+      const id = document.getElementById('editDeviceId').value;
+      const sn = document.getElementById('devSN').value.trim();
+
+      const dup = devices.some(d => !(id && d.id === id) && d.sn && d.sn.trim().toLowerCase() === sn.toLowerCase());
+      if (dup) { toast(`الرقم التسلسلي (${sn}) مسجل مسبقاً لجهاز آخر.`, 'err'); document.getElementById('devSN').focus(); return; }
+
+      const assetNo = document.getElementById('devAssetNo').value.trim();
+      if (assetNo && devices.some(d => !(id && d.id === id) && d.assetNo && d.assetNo.trim().toLowerCase() === assetNo.toLowerCase())) {
+        toast(`رقم الأصل (${assetNo}) مستخدم لجهاز آخر.`, 'err'); return;
+      }
+
+      const rawInterval = document.getElementById('devInterval').value;
+      const data = {
+        name: document.getElementById('devName').value.trim(),
+        brand: document.getElementById('devBrand').value.trim(),
+        sn, assetNo,
+        lab: document.getElementById('devLab').value,
+        status: document.getElementById('devStatus').value,
+        lastDate: document.getElementById('devLastDate').value,
+        certExpiry: document.getElementById('devCertExpiry').value,
+        intervalMonths: rawInterval === 'CNN' ? 'CNN' : (parseInt(rawInterval, 10) || 6),
+        calibParams: document.getElementById('devCalibParams').value.trim(),
+        rangeAccuracy: document.getElementById('devRangeAccuracy').value.trim(),
+        tolerance: document.getElementById('devTolerance').value.trim(),
+        notes: document.getElementById('devNotes').value.trim(),
+        parts: collectParts()
+      };
+
+      setBusy(form, true, 'جارٍ الحفظ...');
+      try {
+        let attachment = editingExistingAttachment;
+        const f = document.getElementById('devAttachmentInput').files[0];
+        if (f) attachment = await uploadFile(f, 'attachments');
+        if (attachment) data.attachment = attachment;
+
+        const ops = [];
+        if (id) {
+          const old = findAny(id) || {};
+          const upd = { ...data };
+          if (old.lab && old.lab !== data.lab) upd.transfers = FV.arrayUnion({ from: old.lab, to: data.lab, date: todayISO(), by: user });
+          const changes = diffObjects(old, data);
+          ops.push({ t: 'update', ref: db.collection(COLLECTION_NAME).doc(id), data: upd });
+          if (changes.length) ops.push({ t: 'set', ref: db.collection(AUDIT_COLLECTION).doc(), data: auditDoc('update', { ...old, id }, changes, user) });
+        } else {
+          const ref = db.collection(COLLECTION_NAME).doc();
+          data.history = [{ date: data.lastDate, inspector: user, type: 'فحص استلام أولي', notes: data.notes || 'تم تسجيل الجهاز بالمنظومة', attachment: attachment || null }];
+          data.transfers = [];
+          data.docs = [];
+          ops.push({ t: 'set', ref, data });
+          ops.push({ t: 'set', ref: db.collection(AUDIT_COLLECTION).doc(), data: auditDoc('create', { ...data, id: ref.id }, diffObjects({}, data), user) });
+        }
+        await commitOps(ops);
+        closeDeviceModal();
+        toast('تم الحفظ');
+      } catch (err) {
+        toast('خطأ أثناء الحفظ: ' + err.message, 'err');
+      } finally { setBusy(form, false); }
+    }
+
+    async function deleteDevice(id) {
+      const dev = findAny(id); if (!dev) return;
+      const user = ensureUser(); if (!user) return;
+      if (!confirm(`حذف الجهاز "${dev.name}" وسجله من المنظومة؟ (سيبقى أثر الحذف في سجل التدقيق)`)) return;
+      try {
+        await commitOps([
+          { t: 'delete', ref: db.collection(COLLECTION_NAME).doc(id) },
+          { t: 'set', ref: db.collection(AUDIT_COLLECTION).doc(), data: auditDoc('delete', dev, diffObjects(dev, {}), user) }
+        ]);
+        selectedDeviceIds.delete(id); updateBulkToolbarUI();
+        toast('تم الحذف');
+      } catch (err) { toast('خطأ أثناء الحذف: ' + err.message, 'err'); }
+    }
+
+    // ============ Inspection ============
+    function openInspectModal(id) {
+      const dev = findAny(id); if (!dev) return;
+      document.getElementById('inspectDeviceId').value = dev.id;
+      document.getElementById('inspectDeviceName').innerText = `${dev.name} (${dev.sn}) - ${labShort(dev.lab)}`;
+      document.getElementById('inspDate').value = todayISO();
+      document.getElementById('inspStatus').value = normalizeStatus(dev.status);
+      document.getElementById('inspInspector').value = lsGet('vacsera_user') || '';
+      document.getElementById('inspNotes').value = '';
+      document.getElementById('inspType').value = KINDS[dev.category] ? 'معايرة دقيقة (Calibration)' : 'صيانة دورية وقائية';
+      document.getElementById('inspCertExpiry').value = '';
+      document.getElementById('inspAttachmentInput').value = '';
+      openM('inspectModal');
+    }
+    function closeInspectModal() { closeM('inspectModal'); }
+
+    async function saveInspection(e) {
+      e.preventDefault();
+      const user = ensureUser(); if (!user) { toast('لازم تكتب اسمك الأول', 'err'); return; }
+      const form = document.getElementById('inspectForm');
+      const id = document.getElementById('inspectDeviceId').value;
+      const dev = findAny(id); if (!dev) return;
+      const inspDate = document.getElementById('inspDate').value;
+      const type = document.getElementById('inspType').value;
+      const inspector = document.getElementById('inspInspector').value.trim();
+      const status = document.getElementById('inspStatus').value;
+      const notes = document.getElementById('inspNotes').value.trim();
+      const newCert = document.getElementById('inspCertExpiry').value;
+
+      setBusy(form, true, 'جارٍ الحفظ...');
+      try {
+        let att = null;
+        const f = document.getElementById('inspAttachmentInput').files[0];
+        if (f) att = await uploadFile(f, 'inspections');
+
+        const entry = { date: inspDate, type, inspector, notes, attachment: att, by: user };
+        const upd = { lastDate: inspDate, status, notes: notes || dev.notes || '', history: [entry, ...(dev.history || [])] };
+        if (newCert) upd.certExpiry = newCert;
+
+        const after = { ...dev, ...upd };
+        const changes = diffObjects(dev, after).filter(c => c.f !== 'notes');
+        await commitOps([
+          { t: 'update', ref: db.collection(COLLECTION_NAME).doc(id), data: upd },
+          { t: 'set', ref: db.collection(AUDIT_COLLECTION).doc(), data: auditDoc('inspection', dev, changes, user, `${type} — ${inspector}`) }
+        ]);
+        closeInspectModal();
+        toast('تم حفظ الكشف');
+      } catch (err) { toast('خطأ أثناء حفظ الفحص: ' + err.message, 'err'); }
+      finally { setBusy(form, false); }
+    }
+
+    // ============ History modal ============
+    function openHistoryModal(id) {
+      const dev = findAny(id); if (!dev) return;
+      activeHistoryDeviceId = dev.id;
+      document.getElementById('historyDeviceTitle').innerText = `${dev.name} [S/N: ${dev.sn}] - ${labShort(dev.lab)}`;
+
+      const partsHtml = (dev.parts || []).map(p => {
+        const pd = getPartDue(p);
+        const cls = !pd ? 'text-slate-500' : (pd.days < 0 ? 'text-red-600' : (pd.days <= LEAD_DAYS ? 'text-amber-600' : 'text-emerald-600'));
+        return `<div class="flex justify-between"><span>${esc(p.name)}</span><span class="font-mono ${cls}">${pd ? esc(formatISODate(pd.next)) : '—'}</span></div>`;
+      }).join('');
+
+      document.getElementById('historyDeviceSpecsBox').innerHTML = `
+        <div class="grid grid-cols-2 gap-2">
+          <div><span class="text-slate-500">الشركة:</span> <span class="font-bold">${esc(dev.brand) || '—'}</span></div>
+          <div><span class="text-slate-500">الحالة:</span> <span class="font-bold">${esc(normalizeStatus(dev.status))}</span></div>
+          <div><span class="text-slate-500">رقم الأصل:</span> <span class="font-bold font-mono">${esc(dev.assetNo) || '—'}</span></div>
+          <div><span class="text-slate-500">انتهاء الشهادة:</span> <span class="font-bold font-mono">${esc(dev.certExpiry) || '—'}</span></div>
+          <div><span class="text-slate-500">المعايرة:</span> <span class="font-bold">${esc(dev.calibParams) || '—'}</span></div>
+          <div><span class="text-slate-500">المدى والسماح:</span> <span class="font-bold font-mono">${esc(dev.tolerance || dev.rangeAccuracy) || '—'}</span></div>
+        </div>
+        ${partsHtml ? `<div class="pt-2 mt-2 border-t border-slate-200"><div class="font-bold text-slate-700 mb-1">قطع الغيار (موعد التغيير القادم)</div>${partsHtml}</div>` : ''}`;
+
+      const c = document.getElementById('historyTimeline');
+      c.innerHTML = '';
+      const history = dev.history || [];
+      if (!history.length) c.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">لا توجد سجلات كشف سابقة.</p>';
+      history.forEach((item, idx) => {
+        const div = document.createElement('div');
+        div.className = 'border-r-2 border-vacsera-red pr-3 py-1 space-y-1 bg-slate-50 p-2 rounded-xl border border-slate-200';
+        const att = item.attachment && (item.attachment.url || item.attachment.data)
+          ? `<button onclick="viewHistoryAttachment(${idx})" class="text-[11px] font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 px-2 py-0.5 rounded flex items-center gap-1"><i class="fa-solid fa-paperclip"></i><span>عرض شهادة/تقرير الفحص</span></button>` : '';
+        div.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black text-slate-800">${esc(item.type) || 'فحص دوري'}</span>
+            <span class="text-[11px] font-mono text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">${esc(item.date)}</span>
+          </div>
+          <div class="text-xs text-slate-600"><span class="font-bold">القائم بالفحص:</span> ${esc(item.inspector) || 'مهندس الصيانة'}</div>
+          ${item.notes ? `<div class="text-xs text-slate-600 bg-white p-2 rounded-lg border border-slate-100">${esc(item.notes)}</div>` : ''}
+          ${att ? `<div class="pt-1">${att}</div>` : ''}`;
+        c.appendChild(div);
+      });
+
+      const tr = [...(dev.transfers || [])].reverse();
+      if (tr.length) {
+        const t = document.createElement('div');
+        t.className = 'pt-2';
+        t.innerHTML = `<div class="text-xs font-black text-slate-700 mb-1"><i class="fa-solid fa-route text-indigo-500 ml-1"></i>سجل النقل بين الأماكن</div>` +
+          tr.map(x => `<div class="text-[11px] bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-1 mb-1">من <b>${esc(labShort(x.from))}</b> إلى <b>${esc(labShort(x.to))}</b> — <span class="font-mono">${esc(x.date)}</span>${x.by ? ' — ' + esc(x.by) : ''}</div>`).join('');
+        c.appendChild(t);
+      }
+      openM('historyModal');
+    }
+    function closeHistoryModal() { closeM('historyModal'); }
+    function openQRModalFromHistory() { if (activeHistoryDeviceId) openQRModal(activeHistoryDeviceId); }
+    function histQuickInspect() { if (activeHistoryDeviceId) { closeHistoryModal(); openInspectModal(activeHistoryDeviceId); } }
+    function histOpenDocs() { if (activeHistoryDeviceId) openDocsModal(activeHistoryDeviceId); }
+    function histOpenAudit() { if (activeHistoryDeviceId) openAuditModal(activeHistoryDeviceId); }
+
+    // ============ Documents ============
+    function openDocsModal(id) {
+      const dev = findAny(id); if (!dev) return;
+      activeDocsDeviceId = id;
+      document.getElementById('docsDeviceTitle').innerText = `${dev.name} [${dev.sn}]`;
+      document.getElementById('docTitle').value = '';
+      document.getElementById('docFile').value = '';
+      renderDocsList();
+      openM('docsModal');
+    }
+    function renderDocsList() {
+      const dev = findAny(activeDocsDeviceId);
+      const box = document.getElementById('docsList');
+      if (!dev) { box.innerHTML = ''; return; }
+      const docs = dev.docs || [];
+      if (!docs.length) { box.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">لا توجد مستندات. أضف كتالوج أو SOP من الأسفل.</p>'; return; }
+      box.innerHTML = docs.map((d, i) => `
+        <div class="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+          <div class="min-w-0">
+            <div class="text-sm font-bold text-slate-800 truncate">${esc(d.title)}</div>
+            <div class="text-[11px] text-slate-500"><span class="bg-white border border-slate-200 rounded px-1.5 py-0.5 font-bold">${esc(d.category)}</span> ${esc(d.date)} ${d.by ? '— ' + esc(d.by) : ''}</div>
+          </div>
+          <div class="flex gap-1 shrink-0">
+            <button onclick="viewDoc(${i})" class="px-2 py-1 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg"><i class="fa-solid fa-eye"></i></button>
+            <button onclick="removeDoc(${i})" class="px-2 py-1 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg"><i class="fa-solid fa-trash-can"></i></button>
+          </div>
+        </div>`).join('');
+    }
+    function viewDoc(i) {
+      const dev = findAny(activeDocsDeviceId);
+      if (dev && dev.docs && dev.docs[i]) viewAttachment(dev.docs[i].file);
+    }
+    async function uploadDoc() {
+      const user = ensureUser(); if (!user) { toast('لازم تكتب اسمك الأول', 'err'); return; }
+      const dev = findAny(activeDocsDeviceId); if (!dev) return;
+      const f = document.getElementById('docFile').files[0];
+      if (!f) { toast('اختر ملفاً أولاً', 'err'); return; }
+      const btn = document.getElementById('docUploadBtn');
+      btn.disabled = true; btn.textContent = 'جارٍ الرفع...';
+      try {
+        const file = await uploadFile(f, 'docs/' + dev.id);
+        const doc = { title: document.getElementById('docTitle').value.trim() || f.name, category: document.getElementById('docCategory').value, date: todayISO(), by: user, file };
+        await commitOps([
+          { t: 'update', ref: db.collection(COLLECTION_NAME).doc(dev.id), data: { docs: FV.arrayUnion(doc) } },
+          { t: 'set', ref: db.collection(AUDIT_COLLECTION).doc(), data: auditDoc('add_doc', dev, [], user, `${doc.category}: ${doc.title}`) }
+        ]);
+        document.getElementById('docTitle').value = ''; document.getElementById('docFile').value = '';
+        toast('تم رفع المستند');
+        setTimeout(renderDocsList, 400);
+      } catch (err) { toast('تعذر الرفع: ' + err.message, 'err'); }
+      finally { btn.disabled = false; btn.textContent = 'رفع المستند'; }
+    }
+    async function removeDoc(i) {
+      const user = ensureUser(); if (!user) return;
+      const dev = findAny(activeDocsDeviceId); if (!dev || !dev.docs || !dev.docs[i]) return;
+      const doc = dev.docs[i];
+      if (!confirm(`حذف المستند "${doc.title}"؟`)) return;
+      try {
+        const docs = dev.docs.filter((_, k) => k !== i);
+        await commitOps([
+          { t: 'update', ref: db.collection(COLLECTION_NAME).doc(dev.id), data: { docs } },
+          { t: 'set', ref: db.collection(AUDIT_COLLECTION).doc(), data: auditDoc('remove_doc', dev, [], user, `${doc.category}: ${doc.title}`) }
+        ]);
+        if (storage && doc.file && doc.file.path) { try { await storage.ref(doc.file.path).delete(); } catch (_) {} }
+        toast('تم حذف المستند');
+        setTimeout(renderDocsList, 400);
+      } catch (err) { toast('خطأ: ' + err.message, 'err'); }
+    }
+
+    // ============ QR ============
+    function deviceUrl(dev) { return `${window.location.origin}${window.location.pathname}?dev=${encodeURIComponent(dev.id)}`; }
+    function openQRModal(id) {
+      const dev = findAny(id); if (!dev) return;
+      document.getElementById('qrDevName').innerText = dev.name || '';
+      document.getElementById('qrDevSN').innerText = dev.sn || '';
+      document.getElementById('qrDevBrand').innerText = dev.brand || '';
+      document.getElementById('qrDevAsset').innerText = dev.assetNo || '';
+      document.getElementById('qrAssetRow').classList.toggle('hidden', !dev.assetNo);
+      document.getElementById('qrLabName').innerText = labLabel(dev.lab);
+      const c = document.getElementById('qrContainer');
+      c.innerHTML = '';
+      new QRCode(c, { text: deviceUrl(dev), width: 140, height: 140, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+      openM('qrModal');
+    }
+    function closeQRModal() { closeM('qrModal'); }
+    function doPrint(mode) {
+      document.body.classList.remove('printing-qr', 'printing-report', 'printing-labels');
+      document.body.classList.add('printing-' + mode);
+      window.print();
+      document.body.classList.remove('printing-' + mode);
+    }
+    function printAssetTag() { doPrint('qr'); }
+
+    function printLabels(ids) {
+      const list = ids.map(id => findAny(id)).filter(Boolean);
+      if (!list.length) { toast('اختر أجهزة أولاً', 'err'); return; }
+      const sheet = document.getElementById('labelsSheet');
+      sheet.innerHTML = '';
+      list.forEach(dev => {
+        const item = document.createElement('div');
+        item.className = 'label-item';
+        const qr = document.createElement('div');
+        const txt = document.createElement('div');
+        txt.className = 'lt';
+        txt.innerHTML = `<b>${esc(dev.name)}</b><br>S/N: ${esc(dev.sn)}<br>${dev.assetNo ? 'Asset: ' + esc(dev.assetNo) + '<br>' : ''}${esc(labShort(dev.lab))}<br><span style="font-size:7px;color:#b91c1c;font-weight:700">VACSERA POLIO</span>`;
+        item.appendChild(qr); item.appendChild(txt);
+        sheet.appendChild(item);
+        new QRCode(qr, { text: deviceUrl(dev), width: 78, height: 78, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+      });
+      setTimeout(() => doPrint('labels'), 250);
+    }
+
+    function openScannerModal() {
+      openM('scannerModal');
+      setTimeout(() => {
+        try {
+          html5QrScanner = new Html5Qrcode('qr-reader');
+          html5QrScanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 220, height: 220 } },
+            decodedText => {
+              try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator(); osc.type = 'sine'; osc.frequency.setValueAtTime(800, ctx.currentTime);
+                osc.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 0.15);
+              } catch (_) {}
+              closeScannerModal();
+              let target = decodedText;
+              if (decodedText.includes('dev=')) {
+                try { target = new URL(decodedText).searchParams.get('dev'); }
+                catch (_) { const m = decodedText.match(/dev=([^&]+)/); if (m) target = decodeURIComponent(m[1]); }
+              }
+              const found = [...devices, ...instruments].find(d => d.id === target || d.sn === target || (d.sn && decodedText.includes(d.sn)));
+              if (found) openHistoryModal(found.id);
+              else toast('لم يتم العثور على جهاز مطابق للكود: ' + decodedText, 'err');
+            }, () => {}
+          ).catch(err => {
+            console.error(err);
+            document.getElementById('qrReaderContainer').innerHTML = '<p class="p-4 text-center text-xs text-rose-400">تعذر فتح الكاميرا: تأكد من إذن الكاميرا وأن الصفحة مفتوحة عبر HTTPS.</p>';
+          });
+        } catch (e) { console.error(e); }
+      }, 300);
+    }
+    function closeScannerModal() {
+      if (html5QrScanner) {
+        html5QrScanner.stop().then(() => { html5QrScanner.clear(); html5QrScanner = null; }).catch(() => { html5QrScanner = null; });
+      }
+      closeM('scannerModal');
+    }
+
+    // ============ Official report ============
+    function openOfficialReportModal() {
+      const list = selectedDeviceIds.size ? devices.filter(d => selectedDeviceIds.has(d.id)) : devices;
+      document.getElementById('reportScopeNote').innerText = selectedDeviceIds.size ? `(الأجهزة المحددة فقط: ${list.length})` : '(كل الأجهزة)';
+      document.getElementById('reportGeneratedDate').innerText = 'تاريخ إصدار التقرير: ' + new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+      document.getElementById('repStatTotal').innerText = list.length;
+      document.getElementById('repStatOperational').innerText = list.filter(d => normalizeStatus(d.status) === 'سليم').length;
+      document.getElementById('repStatMaintenance').innerText = list.filter(d => normalizeStatus(d.status) === 'صيانة').length;
+      document.getElementById('repStatOut').innerText = list.filter(d => normalizeStatus(d.status) === 'خارج الخدمة').length;
+      const tbody = document.getElementById('reportTableBody');
+      tbody.innerHTML = '';
+      list.forEach((dev, i) => {
+        const tr = document.createElement('tr');
+        tr.className = i % 2 === 0 ? 'bg-white' : 'bg-slate-50';
+        const due = getDueStatus(dev);
+        const spec = esc(dev.tolerance || dev.rangeAccuracy || dev.calibParams) || '—';
+        tr.innerHTML = `
+          <td class="border border-slate-300 p-1.5 text-center font-bold">${i + 1}</td>
+          <td class="border border-slate-300 p-1.5 font-bold">${esc(dev.name) || '—'}${dev.assetNo ? `<div class="font-mono font-normal text-[9px] text-slate-500">${esc(dev.assetNo)}</div>` : ''}</td>
+          <td class="border border-slate-300 p-1.5">${esc(dev.brand) || '—'}</td>
+          <td class="border border-slate-300 p-1.5 font-mono font-bold">${esc(dev.sn) || '—'}</td>
+          <td class="border border-slate-300 p-1.5">${esc(labShort(dev.lab))}</td>
+          <td class="border border-slate-300 p-1.5 text-[9px] text-slate-600">${spec}${dev.certExpiry ? `<div class="font-mono">شهادة حتى ${esc(dev.certExpiry)}</div>` : ''}</td>
+          <td class="border border-slate-300 p-1.5 font-mono">${esc(dev.lastDate) || '—'}</td>
+          <td class="border border-slate-300 p-1.5 font-mono font-bold">${esc(due.nextDateStr) || '—'}</td>
+          <td class="border border-slate-300 p-1.5 text-center font-bold">${esc(normalizeStatus(dev.status))}</td>`;
+        tbody.appendChild(tr);
+      });
+      openM('reportModal');
+    }
+    function closeOfficialReportModal() { closeM('reportModal'); }
+    function printOfficialReport() { doPrint('report'); }
+
+    function handleLogoUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const r = new FileReader();
+      r.onload = e => { lsSet('vacsera_custom_logo', e.target.result); renderCustomLogo(e.target.result); };
+      r.readAsDataURL(file);
+    }
+    function renderCustomLogo(src) {
+      const c = document.getElementById('vacseraLogoContainer');
+      c.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = src; img.alt = 'VACSERA'; img.className = 'max-h-10 object-contain';
+      c.appendChild(img);
+    }
+
+    // ============ Alerts ============
+    function computeAlerts() {
+      const out = [];
+      [...devices, ...instruments].forEach(d => {
+        if (normalizeStatus(d.status) === 'خارج الخدمة') return;
+        const due = getDueStatus(d);
+        if (due.isOverdue || due.isUpcoming) out.push({ dev: d, kind: 'due', sev: due.isOverdue ? 'over' : 'soon', days: due.diffDays, date: due.nextDateStr, label: KINDS[d.category] ? 'معايرة دورية' : 'فحص دوري' });
+        const cert = parseSafeDate(d.certExpiry);
+        if (cert) {
+          const n = daysUntil(cert);
+          if (n < 0) out.push({ dev: d, kind: 'cert', sev: 'over', days: n, date: formatISODate(cert), label: 'شهادة المعايرة منتهية' });
+          else if (n <= Math.max(30, LEAD_DAYS)) out.push({ dev: d, kind: 'cert', sev: 'soon', days: n, date: formatISODate(cert), label: 'انتهاء شهادة المعايرة' });
+        }
+        (d.parts || []).forEach(p => {
+          const pd = getPartDue(p);
+          if (!pd) return;
+          if (pd.days < 0) out.push({ dev: d, kind: 'part', sev: 'over', days: pd.days, date: formatISODate(pd.next), label: 'تغيير ' + p.name });
+          else if (pd.days <= LEAD_DAYS) out.push({ dev: d, kind: 'part', sev: 'soon', days: pd.days, date: formatISODate(pd.next), label: 'تغيير ' + p.name });
+        });
+      });
+      return out.sort((a, b) => a.days - b.days);
+    }
+    function daysText(a) { return a.days < 0 ? `متأخر ${Math.abs(a.days)} يوم` : (a.days === 0 ? 'اليوم' : `بعد ${a.days} يوم`); }
+    function updateAlertBadge() {
+      const al = computeAlerts();
+      const over = al.filter(a => a.sev === 'over').length;
+      const b = document.getElementById('alertBadge');
+      b.textContent = al.length; b.classList.toggle('hidden', al.length === 0);
+      const strip = document.getElementById('alertStrip');
+      if (al.length) {
+        strip.classList.remove('hidden');
+        strip.textContent = `⚠️ ${over} بند متأخر و${al.length - over} مستحق قريباً (فحوصات / شهادات / قطع غيار) — اضغط للتفاصيل`;
+      } else strip.classList.add('hidden');
+    }
+    function openAlerts() {
+      document.getElementById('leadDaysInput').value = LEAD_DAYS;
+      renderAlerts(); openM('alertsModal');
+    }
+    function renderAlerts() {
+      const body = document.getElementById('alertsBody');
+      const al = computeAlerts();
+      if (!al.length) { body.innerHTML = '<div class="text-center text-emerald-600 font-bold py-8"><i class="fa-solid fa-circle-check text-3xl mb-2"></i><p>لا توجد تنبيهات حالياً 👌</p></div>'; return; }
+      const groups = {};
+      al.forEach(a => { const k = a.dev.lab || 'عام'; (groups[k] = groups[k] || []).push(a); });
+      body.innerHTML = Object.keys(groups).map(lab => `
+        <div class="border border-slate-200 rounded-xl overflow-hidden">
+          <div class="flex items-center justify-between bg-slate-50 px-3 py-2">
+            <div class="text-sm font-black text-slate-800">${esc(labLabel(lab))} <span class="text-xs text-slate-500">(${groups[lab].length})</span></div>
+            <div class="flex gap-1">
+              <button onclick="sendAlert('wa','${esc(lab)}')" class="text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-lg"><i class="fa-brands fa-whatsapp"></i> واتساب</button>
+              <button onclick="sendAlert('mail','${esc(lab)}')" class="text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-1 rounded-lg"><i class="fa-solid fa-envelope"></i> إيميل</button>
+            </div>
+          </div>
+          <div class="divide-y divide-slate-100">
+            ${groups[lab].map(a => `
+              <div class="flex items-center justify-between gap-2 px-3 py-2 text-xs">
+                <div class="min-w-0">
+                  <div class="font-bold text-slate-800 truncate">${esc(a.dev.name)} <span class="font-mono text-slate-400">${esc(a.dev.sn)}</span></div>
+                  <div class="text-slate-500">${esc(a.label)} — <span class="font-mono">${esc(a.date)}</span></div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <span class="px-2 py-0.5 rounded-full font-bold ${a.sev === 'over' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'}">${esc(daysText(a))}</span>
+                  <button onclick="openHistoryModal('${esc(a.dev.id)}')" class="text-blue-600"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
+                </div>
+              </div>`).join('')}
+          </div>
+        </div>`).join('');
+    }
+    function alertText(lab) {
+      const items = computeAlerts().filter(a => !lab || (a.dev.lab || 'عام') === lab);
+      if (!items.length) return '';
+      let t = `⚠️ تنبيهات الأجهزة - VACSERA Polio\n${lab ? labLabel(lab) + '\n' : ''}بتاريخ ${todayISO()}\n\n`;
+      items.forEach(a => { t += `• [${daysText(a)}] ${a.dev.name} (${a.dev.sn}) — ${a.label} — ${a.date}${lab ? '' : ' — ' + labShort(a.dev.lab)}\n`; });
+      return t;
+    }
+    function sendAlert(kind, lab) {
+      const text = alertText(lab);
+      if (!text) { toast('لا توجد تنبيهات للإرسال'); return; }
+      if (kind === 'wa') window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+      else if (kind === 'mail') window.location.href = 'mailto:?subject=' + encodeURIComponent('تنبيهات صيانة الأجهزة - VACSERA Polio') + '&body=' + encodeURIComponent(text);
+      else navigator.clipboard.writeText(text).then(() => toast('تم النسخ'), () => toast('تعذر النسخ', 'err'));
+    }
+    function saveLeadDays() {
+      const v = parseInt(document.getElementById('leadDaysInput').value, 10);
+      if (!v || v < 1 || v > 90) { toast('أدخل رقماً بين 1 و 90', 'err'); return; }
+      LEAD_DAYS = v; lsSet('vacsera_lead_days', String(v));
+      updateStats(); renderTable(); updateAlertBadge(); renderAlerts();
+      toast('تم حفظ مدة التنبيه');
+    }
+    function enableNotifications() {
+      if (!('Notification' in window)) { toast('المتصفح لا يدعم الإشعارات', 'err'); return; }
+      Notification.requestPermission().then(p => { toast(p === 'granted' ? 'تم تفعيل الإشعارات' : 'لم يتم منح الإذن', p === 'granted' ? '' : 'err'); if (p === 'granted') maybeNotifyOnLoad(true); });
+    }
+    function maybeNotifyOnLoad(force) {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return;
+      const al = computeAlerts(); if (!al.length) return;
+      if (!force && lsGet('vacsera_last_notify') === todayISO()) return;
+      lsSet('vacsera_last_notify', todayISO());
+      const over = al.filter(a => a.sev === 'over').length;
+      try { new Notification('VACSERA Polio — تنبيهات الأجهزة', { body: `${over} متأخر و${al.length - over} مستحق قريباً` }); } catch (_) {}
+    }
+
+    // ============ Calendar ============
+    function buildEventsMap() {
+      const map = {};
+      const add = (iso, ev) => { (map[iso] = map[iso] || []).push(ev); };
+      [...devices, ...instruments].forEach(d => {
+        if (normalizeStatus(d.status) === 'خارج الخدمة') return;
+        const nx = getNextDueDate(d.lastDate, d.intervalMonths);
+        if (nx) add(formatISODate(nx), { dev: d, kind: 'due', label: KINDS[d.category] ? 'معايرة دورية' : 'فحص دوري' });
+        const c = parseSafeDate(d.certExpiry);
+        if (c) add(formatISODate(c), { dev: d, kind: 'cert', label: 'انتهاء شهادة المعايرة' });
+        (d.parts || []).forEach(p => { const pd = getPartDue(p); if (pd) add(formatISODate(pd.next), { dev: d, kind: 'part', label: 'تغيير ' + p.name }); });
+      });
+      return map;
+    }
+    function openCalendar() { const n = new Date(); calY = n.getFullYear(); calM = n.getMonth(); calSel = null; renderCalendar(); openM('calendarModal'); }
+    function calNav(d) { calM += d; if (calM < 0) { calM = 11; calY--; } if (calM > 11) { calM = 0; calY++; } calSel = null; renderCalendar(); }
+    function evColor(ev, iso) {
+      if (ev.kind === 'cert') return 'bg-purple-500';
+      if (ev.kind === 'part') return 'bg-sky-500';
+      return iso < todayISO() ? 'bg-red-500' : 'bg-amber-500';
+    }
+    function renderCalendar() {
+      const map = buildEventsMap();
+      document.getElementById('calTitle').innerText = new Date(calY, calM, 1).toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' });
+      const grid = document.getElementById('calGrid');
+      grid.innerHTML = '';
+      const lead = (new Date(calY, calM, 1).getDay() + 1) % 7; // Saturday-first
+      const days = new Date(calY, calM + 1, 0).getDate();
+      for (let i = 0; i < lead; i++) grid.appendChild(document.createElement('div'));
+      const today = todayISO();
+      for (let d = 1; d <= days; d++) {
+        const iso = `${calY}-${String(calM + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const evs = map[iso] || [];
+        const cell = document.createElement('div');
+        cell.className = 'min-h-[58px] border rounded-lg p-1 text-[11px] cursor-pointer hover:bg-slate-50 ' + (iso === today ? 'border-vacsera-red bg-red-50' : 'border-slate-200') + (iso === calSel ? ' ring-2 ring-sky-400' : '');
+        cell.onclick = () => { calSel = iso; renderCalendar(); };
+        cell.innerHTML = `<div class="font-black text-slate-700">${d}</div>` +
+          '<div class="flex flex-wrap gap-0.5 mt-0.5">' + evs.slice(0, 6).map(ev => `<span class="w-2 h-2 rounded ${evColor(ev, iso)}"></span>`).join('') + '</div>' +
+          (evs.length > 6 ? `<div class="text-[9px] text-slate-500">+${evs.length - 6}</div>` : '');
+        grid.appendChild(cell);
+      }
+      const det = document.getElementById('calDetail');
+      if (!calSel) { det.innerHTML = '<p class="text-xs text-slate-400 text-center">اضغط على يوم لعرض الأجهزة المستحقة فيه.</p>'; return; }
+      const evs = map[calSel] || [];
+      det.innerHTML = `<div class="text-xs font-black text-slate-700">${esc(calSel)} — ${evs.length} استحقاق</div>` +
+        (evs.length ? evs.map(ev => `
+          <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
+            <div><span class="inline-block w-2 h-2 rounded ${evColor(ev, calSel)} ml-1"></span><b>${esc(ev.dev.name)}</b> <span class="font-mono text-slate-400">${esc(ev.dev.sn)}</span><div class="text-slate-500">${esc(ev.label)} — ${esc(labShort(ev.dev.lab))}</div></div>
+            <button onclick="openHistoryModal('${esc(ev.dev.id)}')" class="text-blue-600"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>
+          </div>`).join('') : '<p class="text-xs text-slate-400">لا استحقاقات في هذا اليوم.</p>');
+    }
+
+    // ============ Analytics ============
+    function bar(pct, color) { return `<div class="h-2 bg-slate-100 rounded"><div class="h-2 rounded ${color}" style="width:${Math.max(0, Math.min(100, pct))}%"></div></div>`; }
+    function openAnalytics() {
+      const el = document.getElementById('analyticsBody');
+      if (!devices.length) { el.innerHTML = '<p class="text-center text-slate-400 py-8">لا توجد بيانات بعد.</p>'; openM('analyticsModal'); return; }
+      const total = devices.length;
+      const st = { ok: devices.filter(d => normalizeStatus(d.status) === 'سليم').length, mt: devices.filter(d => normalizeStatus(d.status) === 'صيانة').length, out: devices.filter(d => normalizeStatus(d.status) === 'خارج الخدمة').length };
+
+      const labs = {};
+      devices.forEach(d => {
+        const k = d.lab || 'عام';
+        labs[k] = labs[k] || { total: 0, overdue: 0, tracked: 0 };
+        labs[k].total++;
+        if (d.intervalMonths !== 'CNN' && normalizeStatus(d.status) !== 'خارج الخدمة') { labs[k].tracked++; if (getDueStatus(d).isOverdue) labs[k].overdue++; }
+      });
+      const labRows = Object.keys(labs).map(k => {
+        const l = labs[k]; const pct = l.tracked ? Math.round((l.tracked - l.overdue) / l.tracked * 100) : 100;
+        const color = pct >= 90 ? 'bg-emerald-500' : (pct >= 70 ? 'bg-amber-500' : 'bg-red-500');
+        return `<div><div class="flex justify-between text-xs font-bold mb-1"><span>${esc(labLabel(k))} <span class="text-slate-400 font-normal">(${l.total} جهاز)</span></span><span>${pct}%</span></div>${bar(pct, color)}</div>`;
+      }).join('');
+
+      const isInsp = h => h.type && h.type !== 'فحص استلام أولي' && h.type !== 'استيراد بيانات';
+      let totalInsp = 0, totalRepairs = 0;
+      const repairsBy = [];
+      const months = {};
+      devices.forEach(d => {
+        let r = 0;
+        (d.history || []).forEach(h => {
+          if (!isInsp(h)) return;
+          totalInsp++;
+          if (String(h.type).includes('إصلاح')) { totalRepairs++; r++; }
+          const m = String(h.date || '').slice(0, 7);
+          if (m) months[m] = (months[m] || 0) + 1;
+        });
+        if (r) repairsBy.push({ d, r });
+      });
+      repairsBy.sort((a, b) => b.r - a.r);
+      const maxR = repairsBy.length ? repairsBy[0].r : 1;
+
+      const now = new Date(); const mKeys = [];
+      for (let i = 5; i >= 0; i--) { const x = new Date(now.getFullYear(), now.getMonth() - i, 1); mKeys.push(`${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}`); }
+      const maxM = Math.max(1, ...mKeys.map(k => months[k] || 0));
+
+      const certExp = devices.filter(d => { const c = parseSafeDate(d.certExpiry); return c && daysUntil(c) < 0; }).length;
+      const noCert = devices.filter(d => !d.certExpiry).length;
+
+      el.innerHTML = `
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-3"><div class="text-[11px] text-slate-500 font-bold">إجمالي الفحوصات</div><div class="text-xl font-black">${totalInsp}</div></div>
+          <div class="bg-amber-50 border border-amber-200 rounded-xl p-3"><div class="text-[11px] text-amber-700 font-bold">عمليات الإصلاح</div><div class="text-xl font-black text-amber-700">${totalRepairs}</div></div>
+          <div class="bg-red-50 border border-red-200 rounded-xl p-3"><div class="text-[11px] text-red-700 font-bold">شهادات منتهية</div><div class="text-xl font-black text-red-600">${certExp}</div></div>
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-3"><div class="text-[11px] text-slate-500 font-bold">بدون تاريخ شهادة</div><div class="text-xl font-black">${noCert}</div></div>
+        </div>
+
+        <div>
+          <div class="text-sm font-black mb-2">توزيع الحالات</div>
+          <div class="flex h-4 rounded overflow-hidden border border-slate-200">
+            <div class="bg-emerald-500" style="width:${st.ok / total * 100}%" title="تعمل"></div>
+            <div class="bg-amber-500" style="width:${st.mt / total * 100}%" title="صيانة"></div>
+            <div class="bg-slate-500" style="width:${st.out / total * 100}%" title="خارج الخدمة"></div>
+          </div>
+          <div class="flex gap-4 text-[11px] font-bold mt-1"><span class="text-emerald-600">تعمل ${st.ok}</span><span class="text-amber-600">صيانة ${st.mt}</span><span class="text-slate-600">خارج الخدمة ${st.out}</span></div>
+        </div>
+
+        <div>
+          <div class="text-sm font-black mb-2">نسبة الالتزام بمواعيد الفحص لكل معمل</div>
+          <div class="space-y-2">${labRows}</div>
+        </div>
+
+        <div>
+          <div class="text-sm font-black mb-2">أكثر الأجهزة أعطالاً (عدد مرات الإصلاح)</div>
+          ${repairsBy.length ? '<div class="space-y-2">' + repairsBy.slice(0, 5).map(x => `<div><div class="flex justify-between text-xs font-bold mb-1"><span>${esc(x.d.name)} <span class="font-mono text-slate-400">${esc(x.d.sn)}</span></span><span>${x.r}</span></div>${bar(x.r / maxR * 100, 'bg-amber-500')}</div>`).join('') + '</div>' : '<p class="text-xs text-slate-400">لا توجد عمليات إصلاح مسجلة بعد.</p>'}
+        </div>
+
+        <div>
+          <div class="text-sm font-black mb-2">الفحوصات خلال آخر 6 شهور</div>
+          <div class="flex items-end gap-2 h-28">
+            ${mKeys.map(k => { const v = months[k] || 0; return `<div class="flex-1 flex flex-col items-center justify-end h-full"><span class="text-[10px] font-bold text-slate-600">${v}</span><div class="w-full bg-purple-500 rounded-t" style="height:${v / maxM * 80}%;min-height:${v ? 4 : 1}px"></div><span class="text-[9px] text-slate-500 mt-1 font-mono">${k.slice(2)}</span></div>`; }).join('')}
+          </div>
+        </div>`;
+      openM('analyticsModal');
+    }
+
+    // ============ Audit log ============
+    async function openAuditModal(deviceId) {
+      auditFilterDevice = deviceId || null;
+      const dev = deviceId ? findAny(deviceId) : null;
+      document.getElementById('auditSubtitle').innerText = dev ? `الجهاز: ${dev.name} [${dev.sn}]` : 'كل الأجهزة (آخر 300 عملية)';
+      const sel = document.getElementById('auditAction');
+      sel.innerHTML = '<option value="ALL">كل الإجراءات</option>' + Object.keys(ACTION_LABELS).map(k => `<option value="${k}">${ACTION_LABELS[k]}</option>`).join('');
+      document.getElementById('auditSearch').value = '';
+      openM('auditModal');
+      await loadAudit();
+    }
+    async function loadAudit() {
+      const body = document.getElementById('auditBody');
+      body.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400">جارٍ التحميل...</td></tr>';
+      try {
+        const snap = await db.collection(AUDIT_COLLECTION).orderBy('ts', 'desc').limit(300).get();
+        auditCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderAudit();
+      } catch (err) {
+        body.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-rose-500">تعذر تحميل السجل: ${esc(err.message)}</td></tr>`;
+      }
+    }
+    function renderAudit() {
+      const body = document.getElementById('auditBody');
+      const q = document.getElementById('auditSearch').value.trim().toLowerCase();
+      const act = document.getElementById('auditAction').value;
+      const rows = auditCache.filter(a => {
+        if (auditFilterDevice && a.deviceId !== auditFilterDevice) return false;
+        if (act !== 'ALL' && a.action !== act) return false;
+        if (!q) return true;
+        return [a.user, a.deviceName, a.sn, a.note].some(x => (x || '').toLowerCase().includes(q));
+      });
+      if (!rows.length) { body.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400">لا توجد سجلات.</td></tr>'; return; }
+      body.innerHTML = rows.map(a => {
+        const t = a.ts && a.ts.toDate ? a.ts.toDate().toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' }) : 'الآن';
+        const ch = (a.changes || []).map(c => `<div><b>${esc(FIELD_LABELS[c.f] || c.f)}:</b> <span class="text-rose-600 line-through">${esc(c.b) || '∅'}</span> ← <span class="text-emerald-700">${esc(c.a) || '∅'}</span></div>`).join('');
+        const color = a.action && a.action.includes('delete') ? 'bg-red-100 text-red-700' : (a.action === 'create' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700');
+        return `<tr class="align-top">
+          <td class="p-2 font-mono whitespace-nowrap">${esc(t)}</td>
+          <td class="p-2 font-bold">${esc(a.user)}</td>
+          <td class="p-2"><span class="px-2 py-0.5 rounded-full font-bold ${color}">${esc(ACTION_LABELS[a.action] || a.action)}</span></td>
+          <td class="p-2">${esc(a.deviceName)}<div class="font-mono text-slate-400">${esc(a.sn)}</div></td>
+          <td class="p-2 text-[11px] space-y-0.5">${ch}${a.note ? `<div class="text-slate-500">${esc(a.note)}</div>` : ''}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ============ Excel export / import ============
+    const EXPORT_HEADERS = ['اسم الجهاز', 'الشركة المصنعة', 'الرقم التسلسلي (S/N)', 'رقم الأصل', 'المعمل', 'معايير المعايرة (Calibration Parameters)', 'المدى والدقة (Measurement Range / Accuracy)', 'القياس المطلوب ونسبة السماح (Measurement Required / Tolerance)', 'تاريخ آخر فحص', 'دورية الفحص (شهور)', 'الفحص القادم', 'تاريخ انتهاء الشهادة', 'الحالة', 'ملاحظات'];
+    function exportExcel() {
+      if (!devices.length && !instruments.length) { toast('لا توجد بيانات لتصديرها.', 'err'); return; }
+      const rows = devices.map(d => {
+        const nx = getNextDueDate(d.lastDate, d.intervalMonths);
+        return [d.name || '', d.brand || '', d.sn || '', d.assetNo || '', d.lab || '', d.calibParams || '', d.rangeAccuracy || '', d.tolerance || '', d.lastDate || '', d.intervalMonths || 6, d.intervalMonths === 'CNN' ? 'C.N.N' : (nx ? formatISODate(nx) : ''), d.certExpiry || '', normalizeStatus(d.status), d.notes || ''];
+      });
+      const ws = XLSX.utils.aoa_to_sheet([EXPORT_HEADERS, ...rows]);
+      ws['!cols'] = EXPORT_HEADERS.map((h, i) => ({ wch: [28, 20, 22, 16, 12, 28, 28, 30, 14, 12, 14, 16, 14, 30][i] }));
+
+      const hist = [['اسم الجهاز', 'S/N', 'المعمل', 'التاريخ', 'نوع الإجراء', 'القائم بالفحص', 'ملاحظات']];
+      devices.forEach(d => (d.history || []).forEach(h => hist.push([d.name || '', d.sn || '', d.lab || '', h.date || '', h.type || '', h.inspector || '', h.notes || ''])));
+      const ws2 = XLSX.utils.aoa_to_sheet(hist);
+      ws2['!cols'] = [{ wch: 28 }, { wch: 22 }, { wch: 12 }, { wch: 14 }, { wch: 28 }, { wch: 20 }, { wch: 40 }];
+
+      const wb = XLSX.utils.book_new();
+      wb.Workbook = { Views: [{ RTL: true }] };
+      XLSX.utils.book_append_sheet(wb, ws, 'الأجهزة');
+      XLSX.utils.book_append_sheet(wb, ws2, 'سجل الفحوصات');
+      if (instruments.length) {
+        const rowsI = [['#', 'Eq. Description', 'Manufacturer (Model/Type/PN)', 'Eq. Serial # / Code #', 'Measurement Range / Accuracy', 'Measurement Required / Tolerance', 'Parameters', 'Interval', 'Notes']];
+        instruments.forEach((i, idx) => {
+          const intLabel = i.intervalText || (i.intervalMonths === 12 ? 'Every Year' : (i.intervalMonths === 6 ? 'Every 6 Months' : (i.intervalMonths === 3 ? 'Every 3 Months' : (i.intervalMonths === 1 ? 'Every Month' : (i.intervalMonths ? `Every ${i.intervalMonths} Months` : 'Every Year')))));
+          rowsI.push([i.seqNo || (idx + 1), i.name || '', i.brand || '', i.sn || '', i.rangeAccuracy || i.instRange || '', i.tolerance || '', i.calibParams || 'Temperature', intLabel, i.notes || '']);
+        });
+        const wsI = XLSX.utils.aoa_to_sheet(rowsI);
+        wsI['!cols'] = [8, 28, 28, 24, 24, 24, 16, 15, 25].map(w => ({ wch: w }));
+        XLSX.utils.book_append_sheet(wb, wsI, 'أجهزة القياس (Equipment List)');
+      }
+      XLSX.writeFile(wb, `VACSERA_Polio_Devices_${todayISO()}.xlsx`);
+    }
+
+    function normTxt(s) { return String(s === undefined || s === null ? '' : s).toLowerCase().replace(/[\u064B-\u065F]/g, '').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').trim(); }
+    const IMPORT_FIELDS = [
+      ['assetNo', ['رقم الاصل', 'asset', 'الجرد']],
+      ['sn', ['s/n', 'التسلسلي', 'serial', 'code #']],
+      ['intervalMonths', ['دوريه', 'فتره المعايره', 'interval']],
+      ['lastDate', ['اخر فحص', 'اخر معايره', 'last']],
+      ['certExpiry', ['انتهاء الشهاده', 'cert']],
+      ['calibParams', ['معايير المعايره', 'calibration param', 'parameters']],
+      ['rangeAccuracy', ['المدي', 'السعه', 'range']],
+      ['tolerance', ['السماح', 'القياس المطلوب', 'tolerance', 'required']],
+      ['assignedTo', ['مركب علي', 'assigned', 'location']],
+      ['lab', ['المعمل', 'lab', 'المكان']],
+      ['brand', ['الشركه', 'brand', 'manufactur']],
+      ['status', ['الحاله', 'status']],
+      ['notes', ['ملاحظات', 'notes']],
+      ['name', ['اسم الجهاز', 'eq. description', 'description', 'الموديل', 'الجهاز', 'name']]
+    ];
+    function mapHeaders(headerRow) {
+      const map = {}; const used = new Set();
+      headerRow.forEach((h, idx) => {
+        const n = normTxt(h);
+        if (!n) return;
+        for (const [field, pats] of IMPORT_FIELDS) {
+          if (used.has(field)) continue;
+          if (pats.some(p => n.includes(p))) { map[idx] = field; used.add(field); break; }
+        }
+      });
+      return map;
+    }
+    function cellToStr(v) {
+      if (v instanceof Date) { return formatISODate(new Date(v.getTime() + 12 * 3600 * 1000)); }
+      return String(v === undefined || v === null ? '' : v).trim();
+    }
+    function normLab(v) {
+      const s = String(v || '').toUpperCase();
+      if (s.includes('CORRIDOR') || s.includes('الممر')) return 'CORRIDOR';
+      for (const c of ['AFP', 'ENV', 'PCR', 'SEQ']) if (s.includes(c)) return c;
+      if (s.includes('C.C') || s.replace(/\s/g, '').includes('CC')) return 'C.C';
+      return 'PCR';
+    }
+
+    async function importFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const user = ensureUser();
+      if (!user) { e.target.value = ''; toast('لازم تكتب اسمك الأول', 'err'); return; }
+      try {
+        let wb;
+        if (/\.csv$/i.test(file.name)) wb = XLSX.read(await file.text(), { type: 'string', cellDates: true });
+        else wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
+        if (rows.length < 2) { toast('الملف فارغ أو غير متوافق.', 'err'); return; }
+        let headerIdx = 0;
+        let map = mapHeaders(rows[0]);
+        if (!Object.values(map).includes('name')) {
+          for (let r = 1; r < Math.min(rows.length, 8); r++) {
+            const m2 = mapHeaders(rows[r]);
+            if (Object.values(m2).includes('name')) { headerIdx = r; map = m2; break; }
+          }
+        }
+        // Handle merged sub-headers (e.g. row 4 has Measurement Range/Accuracy, Tolerance, Parameters, Interval)
+        if (rows[headerIdx + 1]) {
+          const subMap = mapHeaders(rows[headerIdx + 1]);
+          Object.keys(subMap).forEach(k => { if (!map[k]) map[k] = subMap[k]; });
+        }
+        if (!Object.values(map).includes('name')) { toast('لم يتم العثور على عمود "Eq. Description" أو "اسم الجهاز" في الملف.', 'err'); return; }
+
+        const isInst = Boolean(KINDS[currentView]);
+        const targetList = isInst ? instruments.filter(x => x.category === currentView) : devices;
+        const existingSN = new Set(targetList.map(d => (d.sn || '').trim().toLowerCase()));
+        const existingAsset = new Set(targetList.map(d => (d.assetNo || '').trim().toLowerCase()).filter(Boolean));
+        const ops = []; let imported = 0, skipped = 0;
+
+        for (let i = headerIdx + 1; i < rows.length; i++) {
+          const rec = {};
+          rows[i].forEach((v, idx) => { if (map[idx]) rec[map[idx]] = cellToStr(v); });
+          if (!rec.name || normTxt(rec.name) === 'eq description' || normTxt(rows[i][0]) === 'total') continue;
+          const sn = rec.sn || `SN-IMP-${Date.now()}-${i}`;
+          if (existingSN.has(sn.toLowerCase())) { skipped++; continue; }
+          existingSN.add(sn.toLowerCase());
+          let assetNo = rec.assetNo || '';
+          if (assetNo && existingAsset.has(assetNo.toLowerCase())) assetNo = '';
+          if (assetNo) existingAsset.add(assetNo.toLowerCase());
+
+          const lastD = parseSafeDate(rec.lastDate);
+          const lastDate = lastD ? formatISODate(lastD) : todayISO();
+          const rawInt = (rec.intervalMonths || '').replace(/\./g, '').toUpperCase();
+          const defaultInt = isInst ? KINDS[currentView].interval : 6;
+          let interval = (!isInst && rawInt === 'CNN') ? 'CNN' : (parseInt(rawInt, 10) || defaultInt);
+          if (rawInt.includes('YEAR')) interval = 12;
+          else if (rawInt.includes('MONTH') && !parseInt(rawInt, 10)) interval = 1;
+          const certD = parseSafeDate(rec.certExpiry);
+          const ref = db.collection(COLLECTION_NAME).doc();
+
+          if (isInst) {
+            const range = rec.rangeAccuracy || '';
+            const seqVal = parseInt(cellToStr(rows[i][0]), 10);
+            ops.push({ t: 'set', ref, data: {
+              category: currentView, lab: currentView,
+              seqNo: isNaN(seqVal) ? null : seqVal,
+              name: rec.name, brand: rec.brand || KINDS[currentView].brand || 'غير محدد',
+              sn, assetNo,
+              instRange: range, instAccuracy: '', rangeAccuracy: range,
+              tolerance: rec.tolerance || '',
+              calibParams: rec.calibParams || 'Temperature',
+              intervalText: rec.intervalMonths || 'Every Year',
+              assignedTo: '',
+              lastDate, intervalMonths: interval,
+              certExpiry: '',
+              status: normalizeStatus(rec.status), notes: rec.notes || '',
+              parts: [], docs: [], transfers: [],
+              history: [{ date: lastDate, inspector: user, type: 'استيراد بيانات', notes: 'تم استيراد جهاز القياس من ملف ' + file.name }]
+            } });
+          } else {
+            ops.push({ t: 'set', ref, data: {
+              name: rec.name, brand: rec.brand || 'غير محدد', sn, assetNo,
+              lab: normLab(rec.lab), lastDate, intervalMonths: interval,
+              calibParams: rec.calibParams || '', rangeAccuracy: rec.rangeAccuracy || '', tolerance: rec.tolerance || '',
+              certExpiry: certD ? formatISODate(certD) : '', status: normalizeStatus(rec.status), notes: rec.notes || '',
+              parts: [], docs: [], transfers: [],
+              history: [{ date: lastDate, inspector: user, type: 'استيراد بيانات', notes: 'تم استيراد الجهاز من ملف ' + file.name }]
+            } });
+          }
+          imported++;
+        }
+        if (!imported) { toast(skipped ? `كل الأجهزة (${skipped}) مسجلة مسبقاً.` : 'لا توجد صفوف صالحة للاستيراد.', 'err'); return; }
+        ops.push({ t: 'set', ref: db.collection(AUDIT_COLLECTION).doc(), data: auditDoc('import', {}, [], user, `استيراد ${imported} ${isInst ? 'جهاز قياس' : 'جهاز'} من ${file.name}` + (skipped ? ` (تخطي ${skipped} مكرر)` : '')) });
+        await commitOps(ops);
+        toast(`تم استيراد ${imported} ${isInst ? 'جهاز قياس' : 'جهاز'}` + (skipped ? ` (تخطي ${skipped} لتكرار S/N)` : ''));
+      } catch (err) {
+        console.error(err); toast('خطأ أثناء الاستيراد: ' + err.message, 'err');
+      } finally { e.target.value = ''; }
+    }
+
+    // ============ Dostmann measuring instruments (separate registry) ============
+    function findAny(id) { return devices.find(d => d.id === id) || instruments.find(d => d.id === id); }
+
+    // ---- instrument kinds (add a new kind = add one entry here) ----
+    const KINDS = {
+      DOSTMANN: {
+        tab: 'أجهزة القياس (Dostmann)', icon: 'fa-temperature-half', itemLabel: 'جهاز قياس', plural: 'أجهزة قياس',
+        namePh: 'مثال: Indoor-Out door Thermometer', brand: 'TFA Dostmann GmbH(30.1024)', brandPh: 'TFA Dostmann GmbH(30.1024) / Fisher Scientific',
+        rangeCol: 'المدى والدقة', rangeLabel: 'المدى والدقة (Measurement Range / Accuracy)', rangePh: '-50 : +70 C ± 2 C\n-10 : +50 C ± 2 C',
+        tolCol: 'القياس المطلوب / السماح', tolLabel: 'القياس المطلوب / السماح (Measurement Required / Tolerance)', tolPh: '20,30,40 C ± 2 C\n+20 C ± 2 C',
+        interval: 12
+      },
+      PIPETTE_SC: {
+        tab: 'Pipette Single Channel', icon: 'fa-eye-dropper', itemLabel: 'ميكروبيبت', plural: 'ميكروبيبتات',
+        namePh: 'مثال: Eppendorf Research plus 100–1000 µL', brand: '', brandPh: 'مثال: Eppendorf / Gilson',
+        rangeCol: 'السعة / المدى والدقة', rangeLabel: 'السعة / المدى والدقة (Measurement Range / Accuracy)', rangePh: 'مثال: 100 – 1000 µL ± 0.8%',
+        tolCol: 'القياس المطلوب / السماح', tolLabel: 'القياس المطلوب / السماح (Measurement Required / Tolerance)', tolPh: 'مثال: 100, 500, 1000 µL',
+        interval: 6
+      }
+    };
+    let currentView = 'devices';
+
+    function renderTabs() {
+      const box = document.getElementById('viewTabs');
+      if (!box) return;
+      const on = 'bg-vacsera-red text-white shadow-sm', off = 'text-slate-600 hover:bg-slate-100';
+      const btn = (key, icon, label, n) => `<button onclick="setView('${key}')" class="px-4 py-2 rounded-xl text-sm font-bold transition ${currentView === key ? on : off}"><i class="fa-solid ${icon} ml-1"></i> ${esc(label)} <span class="text-[11px] opacity-80">${n}</span></button>`;
+      box.innerHTML = btn('devices', 'fa-microscope', 'الأجهزة المعملية', devices.length) +
+        Object.keys(KINDS).map(k => btn(k, KINDS[k].icon, KINDS[k].tab, instruments.filter(i => i.category === k).length)).join('');
+    }
+
+    function setView(v) {
+      if (v !== 'devices' && !KINDS[v]) v = 'devices';
+      currentView = v;
+      lsSet('vacsera_view', v);
+      document.getElementById('devicesView').classList.toggle('hidden', v !== 'devices');
+      document.getElementById('instrumentsView').classList.toggle('hidden', v === 'devices');
+      const K = KINDS[v];
+      if (K) {
+        document.getElementById('instAddBtnText').innerText = 'إضافة ' + K.itemLabel;
+        document.getElementById('instColRange').innerHTML = `${esc(K.rangeCol)}<div class="text-[10px] font-normal text-slate-400">Measurement Range / Accuracy</div>`;
+        document.getElementById('instColTol').innerHTML = `${esc(K.tolCol)}<div class="text-[10px] font-normal text-slate-400">Measurement Required / Tolerance</div>`;
+        document.getElementById('instEmptyTitle').innerText = 'لا توجد ' + K.plural + ' مسجلة';
+        document.getElementById('instEmptyBtnText').innerText = '+ إضافة أول ' + K.itemLabel;
+      }
+      renderInstruments();
+    }
+
+    function formatIntervalLabel(i) {
+      if (i.intervalText) return i.intervalText;
+      const m = parseInt(i.intervalMonths, 10);
+      if (m === 12) return 'Every Year';
+      if (m === 6) return 'Every 6 Months';
+      if (m === 3) return 'Every 3 Months';
+      if (m === 1) return 'Every Month';
+      if (m === 24) return 'Every 2 Years';
+      return m ? `Every ${m} Months` : 'Every Year';
+    }
+
+    function renderInstruments() {
+      renderTabs();
+      const tb = document.getElementById('instTableBody');
+      if (!tb || !KINDS[currentView]) return;
+      const all = instruments.filter(i => i.category === currentView);
+
+      let ok = 0, soon = 0, over = 0;
+      all.forEach(i => {
+        if (normalizeStatus(i.status) === 'سليم') ok++;
+        if (normalizeStatus(i.status) === 'خارج الخدمة') return;
+        const s = getDueStatus(i);
+        if (s.isOverdue) over++; else if (s.isUpcoming) soon++;
+      });
+      document.getElementById('instStatTotal').innerText = all.length;
+      document.getElementById('instStatOk').innerText = ok;
+      document.getElementById('instStatSoon').innerText = soon;
+      document.getElementById('instStatOver').innerText = over;
+
+      const q = document.getElementById('instSearch').value.trim().toLowerCase();
+      const sf = document.getElementById('instStatusFilter').value;
+      const snCount = {};
+      all.forEach(i => { const s = (i.sn || '').trim().toLowerCase(); if (s) snCount[s] = (snCount[s] || 0) + 1; });
+
+      const list = all.filter(i => {
+        if (q && ![i.name, i.brand, i.sn, i.rangeAccuracy, i.instRange, i.tolerance, i.calibParams, i.notes, i.seqNo].some(x => String(x || '').toLowerCase().includes(q))) return false;
+        const st = normalizeStatus(i.status);
+        if (sf === 'OVERDUE') return st !== 'خارج الخدمة' && getDueStatus(i).isOverdue;
+        return sf === 'ALL' || st === sf;
+      }).sort((a, b) => {
+        const sa = Number(a.seqNo), sb = Number(b.seqNo);
+        if (!isNaN(sa) && !isNaN(sb) && sa !== sb) return sa - sb;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+
+      tb.innerHTML = '';
+      document.getElementById('instEmpty').classList.toggle('hidden', all.length !== 0);
+      list.forEach((i, idx) => {
+        const id = esc(i.id);
+        const dup = i.sn && snCount[i.sn.trim().toLowerCase()] > 1;
+        const rangeTxt = esc(i.rangeAccuracy || i.instRange || '—').replace(/\n/g, '<br>');
+        const tolTxt = esc(i.tolerance || '—').replace(/\n/g, '<br>');
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+        tr.innerHTML = `
+          <td class="py-3.5 px-3 text-center font-mono font-bold text-slate-500 text-xs">${esc(i.seqNo || (idx + 1))}</td>
+          <td class="py-3.5 px-4 font-bold text-slate-900">${esc(i.name) || '—'}</td>
+          <td class="py-3.5 px-4 text-slate-700 font-bold text-xs">${esc(i.brand) || '—'}</td>
+          <td class="py-3.5 px-4 font-mono font-bold text-slate-700 text-xs"><div class="flex items-center gap-1.5 flex-wrap"><span>${esc(i.sn) || '—'}</span>${dup ? '<span class="bg-rose-100 text-rose-700 border border-rose-300 text-[10px] px-1.5 py-0.5 rounded-md font-bold">مكرر</span>' : ''}</div></td>
+          <td class="py-3.5 px-4 text-xs font-mono text-slate-700 leading-relaxed" dir="ltr">${rangeTxt}</td>
+          <td class="py-3.5 px-4 text-xs font-mono text-slate-700 leading-relaxed" dir="ltr">${tolTxt}</td>
+          <td class="py-3.5 px-4 text-xs font-bold text-slate-700">${esc(i.calibParams || 'Temperature')}</td>
+          <td class="py-3.5 px-4 text-xs font-bold text-slate-700">${esc(formatIntervalLabel(i))}</td>
+          <td class="py-3.5 px-4 text-xs text-slate-600">${esc(i.notes) || '—'}</td>
+          <td class="py-3.5 px-4 text-center">
+            <div class="flex items-center justify-center gap-1">
+              <button onclick="openQRModal('${id}')" title="باركود" class="p-2 text-slate-700 hover:bg-slate-100 rounded-lg"><i class="fa-solid fa-qrcode"></i></button>
+              <button onclick="editInstrument('${id}')" title="تعديل" class="p-2 text-slate-500 hover:bg-slate-100 rounded-lg"><i class="fa-solid fa-pen-to-square"></i></button>
+              <button onclick="deleteDevice('${id}')" title="حذف" class="p-2 text-rose-500 hover:bg-rose-50 rounded-lg"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+          </td>`;
+        tb.appendChild(tr);
+      });
+    }
+
+    // fills labels/placeholders/defaults of the instrument form according to the selected kind
+    function applyKindToForm(fresh) {
+      const kind = document.getElementById('instKind').value, K = KINDS[kind];
+      if (!K) return;
+      const set = (id, k, v) => { const el = document.getElementById(id); if (el) el[k] = v; };
+      set('instName', 'placeholder', K.namePh);
+      set('instRangeLabel', 'innerHTML', K.rangeLabel + ' <span class="text-red-500">*</span>');
+      set('instRange', 'placeholder', K.rangePh);
+      set('instTolLabel', 'innerText', K.tolLabel);
+      set('instTolerance', 'placeholder', K.tolPh);
+      set('instBrand', 'placeholder', K.brandPh || '');
+      if (fresh) {
+        const defaults = Object.values(KINDS).map(k => k.brand);
+        const cur = document.getElementById('instBrand').value.trim();
+        if (!cur || defaults.includes(cur)) document.getElementById('instBrand').value = K.brand;
+        document.getElementById('instInterval').value = String(K.interval);
+        document.getElementById('instCalibParams').value = 'Temperature';
+      }
+    }
+
+    function openInstModal(inst) {
+      document.getElementById('instForm').reset();
+      const kind = inst ? inst.category : (KINDS[currentView] ? currentView : 'DOSTMANN');
+      document.getElementById('instKind').value = kind;
+      const K = KINDS[kind];
+      if (inst) {
+        document.getElementById('instModalTitle').innerText = 'تعديل ' + K.itemLabel;
+        document.getElementById('instId').value = inst.id;
+        document.getElementById('instName').value = inst.name || '';
+        document.getElementById('instBrand').value = inst.brand || '';
+        document.getElementById('instSN').value = inst.sn || '';
+        document.getElementById('instRange').value = inst.rangeAccuracy || inst.instRange || '';
+        document.getElementById('instTolerance').value = inst.tolerance || '';
+        document.getElementById('instCalibParams').value = inst.calibParams || 'Temperature';
+        document.getElementById('instInterval').value = String(inst.intervalMonths || K.interval);
+        document.getElementById('instNotes').value = inst.notes || '';
+        applyKindToForm(false);
+      } else {
+        document.getElementById('instModalTitle').innerText = 'إضافة ' + K.itemLabel;
+        document.getElementById('instId').value = '';
+        applyKindToForm(true);
+      }
+      openM('instModal');
+    }
+    function editInstrument(id) { const i = instruments.find(x => x.id === id); if (i) openInstModal(i); }
+
+    async function saveInstrument(e) {
+      e.preventDefault();
+      const user = ensureUser(); if (!user) { toast('لازم تكتب اسمك الأول', 'err'); return; }
+      const form = document.getElementById('instForm');
+      const id = document.getElementById('instId').value;
+      const kind = document.getElementById('instKind').value || 'DOSTMANN';
+      const sn = document.getElementById('instSN').value.trim();
+      if (instruments.some(x => x.id !== id && x.category === kind && x.sn && x.sn.trim().toLowerCase() === sn.toLowerCase())) {
+        toast(`الرقم التسلسلي (${sn}) مسجل لجهاز آخر من نفس النوع.`, 'err'); document.getElementById('instSN').focus(); return;
+      }
+      const range = document.getElementById('instRange').value.trim();
+      const intervalMonths = parseInt(document.getElementById('instInterval').value, 10) || KINDS[kind].interval;
+      const intervalMap = { 1: 'Every Month', 3: 'Every 3 Months', 6: 'Every 6 Months', 12: 'Every Year', 24: 'Every 2 Years' };
+      const old = id ? (instruments.find(x => x.id === id) || {}) : {};
+      const data = {
+        category: kind, lab: kind,
+        seqNo: old.seqNo || (instruments.filter(x => x.category === kind).length + 1),
+        name: document.getElementById('instName').value.trim(),
+        brand: document.getElementById('instBrand').value.trim(),
+        sn,
+        instRange: range,
+        rangeAccuracy: range,
+        tolerance: document.getElementById('instTolerance').value.trim(),
+        calibParams: document.getElementById('instCalibParams').value.trim() || 'Temperature',
+        intervalMonths,
+        intervalText: intervalMap[intervalMonths] || 'Every Year',
+        notes: document.getElementById('instNotes').value.trim(),
+        status: old.status || 'سليم',
+        lastDate: old.lastDate || todayISO()
+      };
+      setBusy(form, true, 'جارٍ الحفظ...');
+      try {
+        const ops = [];
+        if (id) {
+          const changes = diffObjects(old, data);
+          ops.push({ t: 'update', ref: db.collection(COLLECTION_NAME).doc(id), data });
+          if (changes.length) ops.push({ t: 'set', ref: db.collection(AUDIT_COLLECTION).doc(), data: auditDoc('update', { ...old, id }, changes, user) });
+        } else {
+          const ref = db.collection(COLLECTION_NAME).doc();
+          data.history = [{ date: data.lastDate, inspector: user, type: 'فحص استلام أولي', notes: data.notes || 'تم التسجيل بالمنظومة' }];
+          data.transfers = []; data.docs = []; data.parts = [];
+          ops.push({ t: 'set', ref, data });
+          ops.push({ t: 'set', ref: db.collection(AUDIT_COLLECTION).doc(), data: auditDoc('create', { ...data, id: ref.id }, diffObjects({}, data), user) });
+        }
+        await commitOps(ops);
+        closeM('instModal');
+        toast('تم الحفظ');
+        if (kind !== currentView) setView(kind);
+      } catch (err) { toast('خطأ أثناء الحفظ: ' + err.message, 'err'); }
+      finally { setBusy(form, false); }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => { initCloudSync(); setView(lsGet('vacsera_view') || 'devices'); });
+  </script>
+</body>
+</html>
